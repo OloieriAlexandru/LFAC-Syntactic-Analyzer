@@ -1,0 +1,35 @@
+Borlo language:
+
+### Types:
+* int, float, char, string, bool
+
+### Const types:
+* const int, float, char, string, bool
+
+### Functions:                                           
+* func ID ( parameters ) -> returnType { functionBody }
+
+### Variable declarations:
+* simple:
+def ID -> type;
+* multiple:
+def ID1 = value, ID2 -> type;
+* arrays:
+def ID -> type[size];
+
+### Custom types:
+* defType ID { customTypeBody }
+
+### Main function:
+* main -> anyType { mainFunctionBody } 
+
+### Statements:
+* If statement:
+	if ( condition ) -> { } else -> { }
+	if ( condition1 ) -> { } else if ( condition2 ) -> { } else -> { }
+* While statement:
+	while ( condition ) -> { }
+* For statement:
+	for ( def var = value ; condition ; expression ) -> { }
+* Assignment statement:
+	ID = expression;

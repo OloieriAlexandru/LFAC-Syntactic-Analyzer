@@ -1,0 +1,6 @@
+func function1 ( float a, int b ) -> bool { }
+
+main -> void { 
+	if (a == b) -> { }
+	for (def a = 1 -> int; a <= b; ++a) -> { }
+}
