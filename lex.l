@@ -4,11 +4,11 @@
 #include "yacc.tab.h"
 %}
 %option yylineno
-%%
-\n					{ ++yylineno; REJECT; }
+%%                                                              
 "int"|"float"|"char"|"string"|"bool"|"void" 	{ yylval.stringVal = strdup(yytext); return TYPE; }
 "main"					{ return MAIN; }
 "if"					{ return IF; }
+"else"					{ return ELSE; }
 "for"					{ return FOR; }
 "while"					{ return WHILE; }
 "do"					{ return DO; }
@@ -19,10 +19,12 @@
 "defType"				{ return DEFTYPE; }
 "func"					{ return FUNC; }
 "def"					{ return DEF; }
-"->"					{ return ARROW; }
+"object"				{ return OBJECT; }
+"const"					{ return CONST; }
+"->"					{ return ARROW; } 
 "{"					{ return O_BRACE; }
 "}"					{ return C_BRACE; }
-"("					{ return O_PAR; }
+"("					{ return O_PAR; }   
 ")"					{ return C_PAR; }
 "=="					{ return EQUALS; }
 "!="					{ return NOT_EQUALS; }
@@ -47,10 +49,11 @@
 "|"					{ return BIT_OR; }
 ">>"					{ return BIT_SHL; }
 "<<"					{ return BIT_SHR; }
-","					{ return COMMA; }
-":"					{ return COLON; }
+","					{ return COMMA; } 
+":"					{ return COLON; }  
 "["					{ return O_BRACKET; }
-"]"					{ return C_BRACKET; }
+"]"					{ return C_BRACKET; }  
+-?[0-9]([0-9]{0,8})\.[0-9]+		{ return TYPE_NFLOAT; }
 "0"|-?[1-9]([0-9]{0,8})			{ yylval.numVal = atoi(yytext); return TYPE_NUM; }
 \'.\'					{ yylval.charVal = yytext[0]; return TYPE_CHAR; }
 \"(.|\n)*\"				{ yylval.stringVal = strdup(yytext); return TYPE_STR; }

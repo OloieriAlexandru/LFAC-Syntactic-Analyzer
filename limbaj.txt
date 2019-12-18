@@ -1,13 +1,16 @@
 Borlo language:
 
 ### Types:
-* int, float, char, string, bool
+* int, float, char, string, bool, void
 
 ### Const types:
-* const int, float, char, string, bool
+* const int, float, char, string, bool, void
 
 ### Functions:                                           
 * func ID ( parameters ) -> returnType { functionBody }
+                                              
+### Custom types:
+* defType ID -> { customTypeBodyDeclarations }
 
 ### Variable declarations:
 * simple:
@@ -16,10 +19,11 @@ def ID -> type;
 def ID1 = value, ID2 -> type;
 * arrays:
 def ID -> type[size];
-
-### Custom types:
-* defType ID { customTypeBody }
-
+* const:
+def const ID -> type;
+* custom type:
+def object ID = { attributeID1 : value, attributeID2 : value } -> type;
+                                          
 ### Main function:
 * main -> anyType { mainFunctionBody } 
 
@@ -27,9 +31,17 @@ def ID -> type[size];
 * If statement:
 	if ( condition ) -> { } else -> { }
 	if ( condition1 ) -> { } else if ( condition2 ) -> { } else -> { }
-* While statement:
+* While loop:
 	while ( condition ) -> { }
-* For statement:
+* For loop:
 	for ( def var = value ; condition ; expression ) -> { }
+* Do while loop:
+	do -> { } while (condition);
 * Assignment statement:
 	ID = expression;
+* Return statement:
+	return expression;
+
+### Function call:
+* functionID (( callParameters ))
+* object::functionID (( callParameters ))

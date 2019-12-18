@@ -13,12 +13,12 @@
 #define pb 	push_back
 #define mp 	make_pair
 #define umap	std::unordered_map
-
+   
 extern int yylineno;
 void yyerror(const char *str) { printf("%s %d\n", str, yylineno); }
 int yylex();
 %}
-
+                   
 %union{
 	int 	numVal;
 	char*	stringVal;
@@ -26,7 +26,7 @@ int yylex();
 }
 
 %start 	check
-%token  MAIN IF FOR WHILE DO RETURN DEFTYPE FUNC DEF ARROW O_BRACE C_BRACE O_PAR C_PAR EQUALS NOT_EQUALS OP_EQUALS OP_ADDEQ OP_SUBEQ DOT SEMICOLON DADD DSUB COMMA COLON O_BRACKET C_BRACKET 
+%token  MAIN IF ELSE TYPE_NFLOAT FOR WHILE DO RETURN DEFTYPE OBJECT CONST FUNC DEF ARROW O_PAR C_PAR O_BRACE C_BRACE EQUALS NOT_EQUALS OP_EQUALS OP_ADDEQ OP_SUBEQ DOT SEMICOLON DADD DSUB COMMA COLON O_BRACKET C_BRACKET 
 %token  <numVal> TYPE_NUM TYPE_BOOL
 %token 	<charVal> TYPE_CHAR
 %token 	<stringVal> TYPE_STR TYPE ID
@@ -47,10 +47,12 @@ program					: definitions main			{ }
 					| main					{ }
 					;
 
-definitions				: definitions function_declaration	{ }
-					| definitions custom_type_declaration	{ }
-					| function_declaration			{ }
-					| custom_type_declaration		{ }
+definitions				: definitions function_declaration		{ }
+					| definitions custom_type_declaration		{ }
+					| definitions any_variables_declarations 	{ }
+					| function_declaration				{ }
+					| custom_type_declaration			{ }
+					| any_variables_declarations			{ }
 					;
 
 function_declaration			: function_header instructions_block	{ }
@@ -68,8 +70,8 @@ function_parameter			: TYPE ID						{ }
 					| TYPE ID OP_EQUALS TYPE_NUM				{ }
 					;
 
-custom_type_declaration			: DEFTYPE ID O_BRACE custom_type_body C_BRACE		{ }
-					| DEFTYPE ID O_BRACE C_BRACE				{ }
+custom_type_declaration			: DEFTYPE ID ARROW O_BRACE custom_type_body C_BRACE	{ }
+					| DEFTYPE ID ARROW O_BRACE C_BRACE			{ }
 					;
 					
 custom_type_body			: custom_type_body custom_type_body_declaration		{ }
@@ -77,7 +79,7 @@ custom_type_body			: custom_type_body custom_type_body_declaration		{ }
 					;
 
 custom_type_body_declaration		: function_declaration					{ }
-					| variables_declaration_full				{ }
+					| any_variables_declarations				{ }
 					;
 
 main					: MAIN ARROW TYPE instructions_block	{ }
@@ -93,23 +95,58 @@ instructions				: instructions instruction		{ }
 
 instruction				: instructions_block			{ }
 					| variables_declaration_full		{ }
+					| const_variables_declaration_full	{ }
+					| function_call_full			{ }
+					| return_statement_full			{ }
+					| variables_operations_full		{ }
 					| if_block				{ }
 					| for_loop				{ }
 					| while_loop				{ }
+					| do_while_loop				{ }
 					;
 
-if_block				: IF O_PAR logical_expression_1 C_PAR ARROW instructions_block	{ }
-					| IF O_PAR  C_PAR ARROW instructions_block			{ }
+return_statement_full			: return_statement SEMICOLON		{ }
+					;
+
+return_statement			: RETURN return_statement_arg		{ }
+					| RETURN				{ }
+					;
+
+return_statement_arg			: logical_expression_1                          { }
+					| arithmetic_expression_1			{ }
+					| types_constants				{ }
+					;					
+
+if_block				: IF O_PAR logical_expression_1 C_PAR ARROW instructions_block					{ }
+					| IF O_PAR C_PAR ARROW instructions_block							{ }
+					| IF O_PAR logical_expression_1 C_PAR ARROW instructions_block ELSE ARROW instructions_block	{ }
+					| IF O_PAR logical_expression_1 C_PAR ARROW instructions_block ELSE if_block			{ }
 					; 
 
 for_loop				: FOR O_PAR for_loop_header C_PAR ARROW instructions_block	{ }
 					;
 
 for_loop_header				: variables_declaration SEMICOLON logical_expression_1 SEMICOLON variables_operations	{ }
+					| variables_declaration SEMICOLON logical_expression_1 SEMICOLON			{ }
+					| variables_declaration SEMICOLON SEMICOLON variables_operations			{ }
+					| variables_declaration SEMICOLON SEMICOLON						{ }
+					| SEMICOLON logical_expression_1 SEMICOLON variables_operations				{ }
+					| SEMICOLON logical_expression_1 SEMICOLON 						{ }
+					| SEMICOLON SEMICOLON variables_operations						{ }
+					| SEMICOLON SEMICOLON									{ }
 					;
 
 while_loop				: WHILE O_PAR logical_expression_1 C_PAR ARROW instructions_block	{ }
 					| WHILE O_PAR C_PAR ARROW instructions_block				{ }
+					;
+
+do_while_loop				: DO ARROW instructions_block WHILE O_PAR logical_expression_1 C_PAR SEMICOLON	{ }
+					| DO ARROW instructions_block WHILE O_PAR C_PAR SEMICOLON                       { }
+					;
+
+any_variables_declarations		: variables_declaration_full			{ }
+					| const_variables_declaration_full		{ }
+					| custom_type_variable_declaration_full		{ }
 					;
 
 variables_declaration_full		: variables_declaration SEMICOLON			{ }
@@ -118,13 +155,51 @@ variables_declaration_full		: variables_declaration SEMICOLON			{ }
 variables_declaration			: DEF variables_declaration_list ARROW TYPE 		{ }
 					;
 
-variables_declaration_list		: variables_declaration_list variable_declaration	{ }
+variables_declaration_list		: variables_declaration_list COMMA variable_declaration	{ }
 					| variable_declaration					{ }
 					;
 
 variable_declaration			: ID					{ }
 					| ID O_BRACKET TYPE_NUM C_BRACKET	{ }
 					| ID OP_EQUALS arithmetic_expression_1	{ }
+					| ID OP_EQUALS logical_expression_1	{ }
+					;
+
+const_variables_declaration_full	: const_variables_declaration SEMICOLON				{ }
+					;
+
+const_variables_declaration		: DEF CONST const_variables_declaration_list ARROW TYPE		{ }
+					;
+
+const_variables_declaration_list	: const_variables_declaration_list const_variable_declaration	{ }
+					| const_variable_declaration					{ }
+					;
+
+const_variable_declaration		: ID OP_EQUALS arithmetic_expression_1				{ }
+					| ID OP_EQUALS logical_expression_1				{ }
+					;
+
+custom_type_variable_declaration_full	: custom_type_variable_declaration SEMICOLON			{ }
+					;
+
+custom_type_variable_declaration	: DEF OBJECT ID OP_EQUALS custom_type_variable_declaration_body	ARROW ID { }
+					;
+
+custom_type_variable_declaration_body	: O_BRACE custom_type_variable_declaration_decl C_BRACE		{ }
+					| O_BRACE C_BRACE						{ }
+					;
+
+custom_type_variable_declaration_decl	: custom_type_variable_declaration_decl COMMA custom_type_variable_declaration_attr	{ }
+                                        | custom_type_variable_declaration_attr							{ }
+					;
+custom_type_variable_declaration_attr	: ID COLON custom_type_variable_declaration_attr_pos_value	{ }
+                                        ;
+
+custom_type_variable_declaration_attr_pos_value	: arithmetic_expression_1		{ }
+						| logical_expression_1			{ }
+						;
+
+variables_operations_full		: variables_operations SEMICOLON		{ }
 					;
 
 variables_operations			: variables_operations COMMA variable_operation	{ }
@@ -132,6 +207,7 @@ variables_operations			: variables_operations COMMA variable_operation	{ }
 					;
 
 variable_operation			: variable_operation_operand OP_EQUALS arithmetic_expression_1 	{ }
+					| variable_operation_operand OP_EQUALS logical_expression_1	{ }
 					| variable_operation_operand OP_ADDEQ arithmetic_expression_1 	{ }
 					| variable_operation_operand OP_SUBEQ arithmetic_expression_1 	{ }
 					| DADD variable_operation_operand 	 			{ }
@@ -177,8 +253,9 @@ arithmetic_expression_term			: O_PAR arithmetic_expression_1 C_PAR				{$$ = $2;}
 						;
                                                                                  
 operand						: TYPE_NUM                              {$$ = $1;}
+						| TYPE_NFLOAT				{ }
 						| ID                                    { }
-						//| function_call				{;}
+						| function_call				{ }
 						| ID O_BRACKET TYPE_NUM C_BRACKET	{ }
 						;
 
@@ -208,9 +285,30 @@ logical_expression_operand			: TYPE_BOOL                                        
 						| arithmetic_expression_1                                       { }
 						;
 
+function_call_full				: function_call SEMICOLON					{ }
+						;
+
+function_call					: ID COLON COLON ID O_PAR O_PAR function_call_args C_PAR C_PAR	{ }
+						| ID COLON COLON ID O_PAR O_PAR C_PAR C_PAR			{ }
+						| ID O_PAR O_PAR function_call_args C_PAR C_PAR			{ }
+						| ID O_PAR O_PAR C_PAR C_PAR					{ }
+						;
+
+function_call_args				: function_call_args COMMA function_call_arg		{ }
+						| function_call_arg					{ }
+						;
+
+function_call_arg				: logical_expression_1                          { }
+						| arithmetic_expression_1			{ }
+						| types_constants				{ }
+						;
+
+types_constants					: TYPE_STR					{ }
+						| TYPE_CHAR					{ }
+						;
 
 %%
-
+                
 int main() {             
 	return yyparse();
 }
