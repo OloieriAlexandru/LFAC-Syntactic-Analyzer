@@ -64,6 +64,7 @@ defType secondTestStructure -> {
 		} else if (5 < 95) -> {
 		        return 59;
 		}
+		def justTest[321] -> int;
 		return 1.521*10-testObject::intIntFunction(());
 	}
 }

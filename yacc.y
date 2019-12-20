@@ -14,14 +14,18 @@
 #define pair	std::pair
 #define pb 	push_back
 #define mp 	make_pair
-#define umap	std::unordered_map                                     
+#define umap	std::unordered_map
+#define 	ERROR 2147483639                                     
 
 extern int yylineno;
 void yyerror(const char *str) { printf("%s %d\n", str, yylineno); }
 int yylex();
           
 const char *dotsLineStr = "---------------------------------------------------------\n";
-                                                             
+             
+int customStructureParsing;
+int functionParsing;
+                                                
 // Functions parsing:
 
 #define		FUNCTION_ARG(cType, name, nameInUnion) 		\
@@ -39,18 +43,30 @@ union functionArgUnion {
 	FUNCTION_ARG(char,charVal,charUnionMember); 
 };                        
 
-int functionArgsLogicInit;
-umap<char,uchar>functionArgType;
-vector<pair<string,functionArgUnion>> thisFunctionArgs;
-pair<string,string>functionInfo;
-functionArgUnion getFunctionArgUnion(uchar predefinedValueType, void *predefinedValue);
-bool initFunctionArgsLogic(char* argName, uchar predefinedValueType, void *predefinedValue);
-bool addFunctionArg(char *argName, uchar predefinedValueType, void *predefinedValue);
-int printFunctionInfo();
-void printFunctionArg(const pair<string,functionArgUnion> &arg);
-bool clearFunctionArgsArray();
-bool clearFunctionArgsLogic();
+int 					functionArgsLogicInit;
+umap<char,uchar>			functionArgType;
+vector<pair<string,functionArgUnion>> 	thisFunctionArgs;
+pair<string,string>			functionInfo;
+functionArgUnion 	getFunctionArgUnion(uchar predefinedValueType, void *predefinedValue);
+bool 			initFunctionArgsLogic(char* argName, uchar predefinedValueType, void *predefinedValue);
+bool	 		addFunctionArg(char *argName, uchar predefinedValueType, void *predefinedValue);
+int 			printFunctionInfo();
+void 			printFunctionArg(const pair<string,functionArgUnion> &arg);
+bool 			clearFunctionArgsArray();
+bool 			clearFunctionArgsLogic();
             
+// Variables, arrays parsing:
+
+umap<string,pair<int,string>>		localV, globalV;
+umap<string,pair<vector<int>,string>>	localArrs, globalArrs;
+bool 	declareVariable(char *variableName, char* variableType, int value = 0, int local = 1);
+bool 	declareArray(char *arrayName, char* variableType, uint arraySize, int local = 1);
+bool    setVariableValue(char *variableName, int value);
+int 	getVariableValue(char *variableName);           
+bool 	setArrayValue(char *arrayName, uint pos, int value);
+int 	getArrayValue(char *arrayName, uint pos);
+void 	clearLocalVariables();
+
 void initFunctionArgsLogic();
 void init();
 
@@ -94,11 +110,16 @@ definitions				: definitions function_declaration		{ }
 					| any_variables_declarations			{ }
 					;
 
-function_declaration			: function_header instructions_block	{ printFunctionInfo(); clearFunctionArgsLogic(); }
+function_declaration			: function_header instructions_block	{ 
+						printFunctionInfo(); 
+						clearFunctionArgsLogic();
+						clearLocalVariables();
+						functionParsing = 0;
+						}
 					;
 
-function_header				: FUNC ID O_PAR function_parameters C_PAR ARROW TYPE	{ functionInfo = mp(string($2), string($7)); }
-					| FUNC ID O_PAR C_PAR ARROW TYPE 			{ functionInfo = mp(string($2), string($6)); }
+function_header				: FUNC ID O_PAR function_parameters C_PAR ARROW TYPE	{ functionInfo = mp(string($2), string($7)); functionParsing = 1; }
+					| FUNC ID O_PAR C_PAR ARROW TYPE 			{ functionInfo = mp(string($2), string($6)); functionParsing = 1; }
 					;
                                          
 function_parameters			: function_parameters_no_def_values						{ }
@@ -211,9 +232,9 @@ variables_declaration_list		: variables_declaration_list COMMA variable_declarat
 					| variable_declaration					{ }
 					;
 
-variable_declaration			: ID					{ }
-					| ID O_BRACKET TYPE_NUM C_BRACKET	{ }
-					| ID OP_EQUALS arithmetic_expression_1	{ }
+variable_declaration			: ID					{ declareVariable($1, "float", 0, functionParsing); }
+					| ID O_BRACKET TYPE_NUM C_BRACKET	{ declareArray($1, "float", $3, functionParsing); }
+					| ID OP_EQUALS arithmetic_expression_1	{ declareVariable($1, "int", $3, functionParsing); }
 					| ID OP_EQUALS logical_expression_1	{ }
 					;
 
@@ -415,8 +436,17 @@ int printFunctionInfo() {
  	std::cout<<"Function name: "<<functionInfo.first<<'\n';
 	std::cout<<"Function return value: "<<functionInfo.second<<'\n';
 	std::cout<<"Number of arguments: "<< thisFunctionArgs.size()<<'\n';
-	for (uint i=0;i<thisFunctionArgs.size();++i)
+	for (uint i=0;i<thisFunctionArgs.size();++i) {
 		printFunctionArg(thisFunctionArgs[i]);
+	}
+	std::cout<<"Local variables: "<< localV.size() << '\n';
+	for (auto var : localV) {
+	 	std::cout<<var.second.second<<' '<<var.first<<'\n';
+	}
+	std::cout<<"Local arrays: "<< localArrs.size() << '\n';
+	for (auto arr : localArrs) {
+		std::cout<<arr.second.second<<' '<<arr.first<<'['<<arr.second.first.size()<<"]\n";
+	}
 	std::cout<<'\n';		
 }
                                                         
@@ -459,6 +489,100 @@ bool clearFunctionArgsLogic() {
 	}
 	functionArgsLogicInit = 0;
 	return clearFunctionArgsArray();
+}
+
+bool declareVariable(char *variableName, char* variableType, int value, int local) {
+	string name(variableName);	
+	if (local == 1 && localV.count(name)) {
+		return false;
+	} else if (local == 2 && globalV.count(name)) {
+		return false;
+	}
+	string type(variableType);
+	if (local == 1) {
+		localV[name] = mp(value,type);
+	} else {
+		globalV[name] = mp(value,type);
+	}
+	return true;
+}
+
+bool declareArray(char *arrayName, char* variableType, uint arraySize, int local) {       
+	string name(arrayName);	
+	if (local == 1 && localArrs.count(name)) {
+		return false;
+	} else if (local == 2 && globalArrs.count(name)) {
+		return false;
+	}
+	string type(variableType);
+	if (type != "int"){
+		arraySize = 1;
+	}  
+	vector<int>arr(arraySize, 0);
+	if (local == 1) {
+		localArrs[name] = mp(arr,type);
+	} else {
+		globalArrs[name] = mp(arr,type);
+	}
+	return true;	
+}
+
+bool setVariableValue(char *variableName, int value) {
+ 	string name(variableName);
+	bool res = false;
+	if (localV.count(name)) {
+		res = true;
+		localV[name].first = value;
+	} else if (globalV.count(name)) {
+		res = true;
+		globalV[name].first = value;
+	}
+	return true;
+}
+
+int getVariableValue(char *variableName) {
+	string name(variableName);
+	if (localV.count(name)){
+		return localV[name].first;
+	}
+	if (globalV.count(name)){
+		return globalV[name].first;
+	}
+	return ERROR;
+}
+
+bool setArrayValue(char *arrayName, uint pos, int value) {                 
+	string name(arrayName);
+	bool res = false;
+	if (localArrs.count(name)) {
+		if (pos < localArrs[name].first.size()) {
+			localArrs[name].first[pos] = value;	
+		}
+	} else if (globalArrs.count(name)) {
+	 	if (pos < globalArrs[name].first.size()) {
+		        globalArrs[name].first[pos] = value;
+		}
+	}
+	return res;
+}
+
+int getArrayValue(char *arrayName, uint pos) {
+        string name(arrayName);
+	if (localArrs.count(name)) {
+		if (pos < localArrs[name].first.size()) {
+			return localArrs[name].first[pos];	
+		}
+	} else if (globalArrs.count(name)) {
+	 	if (pos < globalArrs[name].first.size()) {
+		        return globalArrs[name].first[pos];
+		}
+	}
+	return ERROR;
+}
+
+void clearLocalVariables() {
+ 	localV.clear();
+	localArrs.clear();
 }
 
 void initFunctionArgsLogic() {
