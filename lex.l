@@ -53,9 +53,9 @@
 ":"					{ return COLON; }  
 "["					{ return O_BRACKET; }
 "]"					{ return C_BRACKET; }  
--?[0-9]([0-9]{0,8})\.[0-9]+		{ return TYPE_NFLOAT; }
+-?[0-9]([0-9]{0,9})\.[0-9]+		{ yylval.floatVal = atof(yytext); return TYPE_NFLOAT; }
 "0"|-?[1-9]([0-9]{0,8})			{ yylval.numVal = atoi(yytext); return TYPE_NUM; }
-\'.\'					{ yylval.charVal = yytext[0]; return TYPE_CHAR; }
+\'.\'					{ yylval.charVal = yytext[1]; return TYPE_CHAR; }
 \"(.|\n)*\"				{ yylval.stringVal = strdup(yytext); return TYPE_STR; }
 "true"|"false"				{ yylval.numVal = (yytext[0] == 't' ? 1 : 0); return TYPE_BOOL; }
 [_A-Za-z][_A-Za-z0-9]*			{ yylval.stringVal = strdup(yytext); return ID; }
