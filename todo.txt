@@ -1,0 +1,28 @@
+1) Language:
+* Predefined types: int , float, char, string, bool 									- done
+* User defined data types;  provide specific syntax to allow initialization and use of variables of these types 	- done
+* Array types 														- done
+* Variable declarations/definition, constant definitions 								- done
+* Control statements (if, for, while, etc.), assignment statements 							- done
+* Arithmetic and boolean expressions											- done
+* Operations with string types												- to do
+* Function calls which can have as parameters: expressions, other function calls, identifiers, constants 		- done
+* A predefined function called Eval which has a parameter of typr int							- to do
+2) Symbol table:
+- Information regarding variable or constant identifiers
+	* type, value, scope												- almost done
+- Information regarding function identifiers
+	* the function signature											- done
+	* whether the function is a method in a class									- to do
+3) Semantic analysis:
+* Any variable that appears in a program has been previously defined							- done
+* A variable should not be declared more than once									- done
+* A variable appearing in the right side of an expression should have been initialized explicitly			- to do
+* A function is not defined more than once with the same signature							- done
+* A function that is called in the program has been defined								- done
+* The left side of an assignment has the same type as the right side							- to do
+* The parameters of a function call have the types from the function definition						- to do
+* In any call to Eval, the parameter has type int									- to do
+4) Evaluation of arithmetic expressions in a program
+* Evaluation logic													- done
+* For each call of the form Eval(expr), the actual value of expr will be printed					- to do	

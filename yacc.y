@@ -45,17 +45,46 @@ union functionArgUnion {
 	FUNCTION_ARG(char,charVal,charUnionMember); 
 };                        
 
+struct functionInfo {
+	functionInfo(const vector<pair<string,functionArgUnion>>& args, const string& nm, const string& tp) {
+		arguments = args;
+		name = nm;
+		type = tp;
+	}
+        vector<pair<string,functionArgUnion>> arguments;
+	string name, type;
+	
+	bool operator==(const functionInfo& other) {
+		if (arguments.size() != other.arguments.size()) {
+			return false;
+		}               
+		for (int i=0;i<arguments.size();++i) {
+			int t1 = (arguments[i].second.type + 5)%5;
+			int t2 = (other.arguments[i].second.type + 5)%5;
+			if (t1 != t2) {
+				return false;
+			}
+		}
+		return true;
+	}
+};
+
+vector<functionInfo>			programFunctions;
 int 					functionArgsLogicInit;
 umap<char,uchar>			functionArgType;
 vector<pair<string,functionArgUnion>> 	thisFunctionArgs;
-pair<string,string>			functionInfo;
+pair<string,string>			thisFunctionInfo;
 functionArgUnion 	getFunctionArgUnion(uchar predefinedValueType, void *predefinedValue);
 bool 			initFunctionArgsLogic(char* argName, uchar predefinedValueType, void *predefinedValue);
 bool	 		addFunctionArg(char *argName, uchar predefinedValueType, void *predefinedValue);
 int 			printFunctionInfo();
+bool			saveFunctionInfo();
 void 			printFunctionArg(const pair<string,functionArgUnion> &arg);
 bool 			clearFunctionArgsArray();
 bool 			clearFunctionArgsLogic();
+
+void 			checkNormalFunctionCall(char *functionName);
+void			clearFunctionCallArguments();
             
 // Variables, arrays parsing:
 
@@ -160,15 +189,17 @@ definitions				: definitions function_declaration		{ }
 					;
 
 function_declaration			: function_header instructions_block	{ 
-						printFunctionInfo(); 
+						if (saveFunctionInfo()) {
+						 	printFunctionInfo();
+						} 
 						clearFunctionArgsLogic();
 						clearLocalVariables();
 						functionParsing = 0;
 						}
 					;
 
-function_header				: FUNC ID O_PAR function_parameters C_PAR ARROW TYPE	{ functionInfo = mp(string($2), string($7)); functionParsing = 1; }
-					| FUNC ID O_PAR C_PAR ARROW TYPE 			{ functionInfo = mp(string($2), string($6)); functionParsing = 1; }
+function_header				: FUNC ID O_PAR function_parameters C_PAR ARROW TYPE	{ thisFunctionInfo = mp(string($2), string($7)); functionParsing = 1; }
+					| FUNC ID O_PAR C_PAR ARROW TYPE 			{ thisFunctionInfo = mp(string($2), string($6)); functionParsing = 1; }
 					;
                                          
 function_parameters			: function_parameters_no_def_values						{ }
@@ -204,9 +235,12 @@ custom_type_body_declaration		: function_declaration					{ }
 					| any_variables_declarations				{ }
 					;
 
-main					: MAIN ARROW TYPE instructions_block	{ }
+main					: main_header instructions_block	{ functionParsing = 0; }
 					;
-                                                                          
+                                        
+main_header				: MAIN ARROW TYPE 			{ functionParsing = 1; }
+					;
+                                  
 instructions_block			: O_BRACE instructions C_BRACE		{ }
 					| O_BRACE C_BRACE			{ }
 					;
@@ -382,9 +416,9 @@ arithmetic_expression_term			: O_PAR arithmetic_expression_1 C_PAR				{ $$ = $2;
 						;
                                                                                  
 operand						: TYPE_NUM                              { $$ = $1; }
-						| ID                                    { }
+						| ID                                    { $$ = getVariableValue($1); }
 						| function_call				{ }
-						| ID O_BRACKET TYPE_NUM C_BRACKET	{ }
+						| ID O_BRACKET TYPE_NUM C_BRACKET	{ $$ = getArrayValue($1, $3); }
 						;
 
 logical_expression_1				: logical_expression_1 OR logical_expression_2			{ }
@@ -418,8 +452,8 @@ function_call_full				: function_call SEMICOLON					{ }
 
 function_call					: ID COLON COLON ID O_PAR O_PAR function_call_args C_PAR C_PAR	{ }
 						| ID COLON COLON ID O_PAR O_PAR C_PAR C_PAR			{ }
-						| ID O_PAR O_PAR function_call_args C_PAR C_PAR			{ }
-						| ID O_PAR O_PAR C_PAR C_PAR					{ }
+						| ID O_PAR O_PAR function_call_args C_PAR C_PAR			{ checkNormalFunctionCall($1); clearFunctionCallArguments(); }
+						| ID O_PAR O_PAR C_PAR C_PAR					{ checkNormalFunctionCall($1); clearFunctionCallArguments(); }
 						;
 
 function_call_args				: function_call_args COMMA function_call_arg		{ }
@@ -489,8 +523,8 @@ bool addFunctionArg(char *argName, uchar predefinedValueType, void *predefinedVa
 
 int printFunctionInfo() {
 	std::cout<<dotsLineStr;
- 	std::cout<<"Function name: "<<functionInfo.first<<'\n';
-	std::cout<<"Function return value: "<<functionInfo.second<<'\n';
+ 	std::cout<<"Function name: "<<thisFunctionInfo.first<<'\n';
+	std::cout<<"Function return value: "<<thisFunctionInfo.second<<'\n';
 	std::cout<<"Number of arguments: "<< thisFunctionArgs.size()<<'\n';
 	for (uint i=0;i<thisFunctionArgs.size();++i) {
 		printFunctionArg(thisFunctionArgs[i]);
@@ -528,6 +562,23 @@ void printFunctionArg(const pair<string,functionArgUnion> &arg) {
 	}
 	std::cout<<'\n';
 }
+
+bool saveFunctionInfo() {
+	functionInfo newFunction(thisFunctionArgs, thisFunctionInfo.first, thisFunctionInfo.second);
+	bool good = true;
+	for (int i=0;i<programFunctions.size();++i) {
+	 	if (programFunctions[i] == newFunction) {
+	 		good = false;
+			break;
+		}
+	}
+	if (good) {
+	 	programFunctions.pb(newFunction);
+	} else {
+	 	printError("Error when declaring the function named \"%s\"! Another function with the same signature was previously defined!\n", thisFunctionInfo.first.c_str());
+	}
+	return good;
+}
    
 bool clearFunctionArgsArray() {
         for (uint i=0;i<thisFunctionArgs.size();++i)
@@ -545,6 +596,25 @@ bool clearFunctionArgsLogic() {
 	}
 	functionArgsLogicInit = 0;
 	return clearFunctionArgsArray();
+}
+
+void checkNormalFunctionCall(char *functionName) {
+	string name(functionName);
+	int index = -1;
+	for (int i=0;i<programFunctions.size();++i) {
+	 	if (programFunctions[i].name == name) {
+		 	index = i;
+			break;
+		}
+	}
+	if (index == -1) {
+		printError("Cannot call function named \"%s\"! A function with this name was not declared!\n", name.c_str());
+		return;
+	}
+}
+
+void clearFunctionCallArguments() {
+
 }
 
 void addVariableToCheck(char* variableName, uchar variableType, void* variableValue, bool isConst) {
@@ -587,7 +657,7 @@ bool checkVariables(uchar varType) {
 			var.second.type = varType;
 		} else {
 		        if (var.second.type != varType) {
-				printError("invalid type for variable %s\n",var.first.c_str());
+				printError("Invalid type for variable \"%s\"\n",var.first.c_str());
 				continue;
 			}              
 		}
@@ -638,8 +708,10 @@ string getTypeName(uchar type, bool isConst) {
 
 bool declareVariable(const string& name, const variableDeclUnion& declUnion, int local, bool isConst) {	
 	if (local == 1 && localV.count(name)) {
+		printError("Local variable \"%s\" was previously defined!\n", name.c_str());
 		return false;
-	} else if (local == 2 && globalV.count(name)) {
+	} else if (local == 0 && globalV.count(name)) {
+		printError("Global variable \"%s\" was previously defined!\n", name.c_str());
 		return false;
 	}
 	string type = getTypeName(declUnion.type, isConst);
@@ -664,8 +736,10 @@ bool declareVariable(const string& name, const variableDeclUnion& declUnion, int
 
 bool declareArray(const string& name, uchar arrayType, uint arraySize, int local) {       
 	if (local == 1 && localArrs.count(name)) {
+		printError("Local array \"%s\" was previously defined!\n", name.c_str());
 		return false;
-	} else if (local == 2 && globalArrs.count(name)) {
+	} else if (local == 0 && globalArrs.count(name)) {  
+		printError("Global array \"%s\" was previously defined!\n", name.c_str());
 		return false;
 	}
 	string type = getTypeName(arrayType);
@@ -701,7 +775,8 @@ int getVariableValue(char *variableName) {
 	}
 	if (globalV.count(name)){
 		return globalV[name].first.intUnionMember.intVal;
-	}
+	}                                                                          
+	printError("The variable \"%s\" was not declared in the program!\n", name.c_str());
 	return ERRORR;
 }
 
@@ -731,6 +806,7 @@ int getArrayValue(char *arrayName, uint pos) {
 		        return globalArrs[name].first[pos];
 		}
 	}
+	printError("The array \"%s\" was not declared in the program!\n", name.c_str());
 	return ERRORR;
 }
 
@@ -760,7 +836,7 @@ void printError(const char*format, ...) {
 	printf("Line %d error: ", yylineno);
      	vprintf(format, args);
 	va_end(args);
-	SetConsoleTextAttribute(hConsole, 15);
+	SetConsoleTextAttribute(hConsole, 7);
 }
  
 int main() {

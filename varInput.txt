@@ -1,8 +1,11 @@
 
 def a = 10, b -> int;
 
+def const testt = 10 -> int;
+
 func cevaFunc() -> void {
-	def a = 10, b = 5.512, c -> float;
+	def b = 5.512, c -> float;
+	def arr[1023] -> int;
 }
 
 main -> void {

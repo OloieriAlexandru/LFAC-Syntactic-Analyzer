@@ -1,0 +1,17 @@
+
+def a = 10, b = "asd" -> int;
+
+func firstFun(int a, float b = 5.56) -> int { }
+func secondFun(int a, float b) -> int { }        
+
+func shortFun() -> int { }
+
+main -> void {
+	def a = 10, a = 50 -> int;
+	def c[100] -> int;
+	def good = c[1], bad = d[100] -> int;
+	longFun(());
+	def testCall = 10 * shortFun(()) -> int;
+	testCall += wrongFunctionCall(());
+	return b;
+}
