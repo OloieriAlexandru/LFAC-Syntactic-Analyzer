@@ -20,7 +20,7 @@
 "func"					{ return FUNC; }
 "def"					{ return DEF; }
 "object"				{ return OBJECT; }
-"const"					{ return CONST; }
+"const"					{ return CONSTT; }
 "->"					{ return ARROW; } 
 "{"					{ return O_BRACE; }
 "}"					{ return C_BRACE; }

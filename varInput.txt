@@ -1,0 +1,10 @@
+
+def a = 10, b -> int;
+
+func cevaFunc() -> void {
+	def a = 10, b = 5.512, c -> float;
+}
+
+main -> void {
+ 	return 0;
+}
