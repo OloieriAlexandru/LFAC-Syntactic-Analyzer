@@ -10,11 +10,19 @@ def const constStrVar = "rts" -> string;
 def const constFloatVar = -10.0 -> float;
 def const constCharVar = 'A' -> char;
 
-func cevaFunc() -> void {
+func cevaFunc() -> int {
 	def b = 5.512, c -> float;
 	def arr[1023] -> int;
+	arr[7] = true;
 }
 
+func f() -> bool { }
+
 main -> void {
+	intVar = $cevaFunc(());
+	boolArray[3] = $cevaFunc(());
+	boolArray[2] = $f(());
+	strVar = "asd";
+	strVar = $charVar;
  	return 0;
 }

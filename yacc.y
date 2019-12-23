@@ -24,7 +24,8 @@
 #define ERRORR 	2147483639
 #define T_VOID	100
 #define NO_VAR	101
-#define NO_FUN	102                                     
+#define NO_ARR	102
+#define NO_FUN	103                                     
 
 extern int yylineno;
 void yyerror(const char *str) { printf("%s %d\n", str, yylineno); }
@@ -149,6 +150,7 @@ umap<string,pair<vector<int>,pair<string,int>>>		localArrs, globalArrs;
 void 	addVariableToCheck(char* variableName, uchar variableType, void* variableValue, bool isConst = false);
 void	addArrayToCheck(char* arrayName, int arraySize);
 bool 	checkVariables(uchar varType);
+bool	checkVariableExistence(char* variableName);
 bool 	checkArrays(uchar arrayType);                                                                
 void 	printVariableInfo(const string& name, const string& type, const variableValueUnion& varInfo); 
 void	printArrayInfo(const string& name, const string& type, int size); 
@@ -163,7 +165,14 @@ int 	getArrayValue(char *arrayName, uint pos);
 void 	clearLocalVariables();
 void	printGlobalVariables();
 void	printGlobalArrays();
+                       
+int 	arrayPosition;
+string 	operandName;                                             
+uchar   getOperandType(char *operandStr);
 uchar	getVariableType(char *variableName);
+uchar 	getArrayType(char *arrayName);
+char* 	buildArrayPositionString(char* arrayName, int position); 
+bool 	checkOperationVarType(uchar varType, uchar expectedType);
 
 // Custom types parsing:
 
@@ -208,7 +217,7 @@ void	printError(const char*format, ...);
 %token  <floatVal> 	TYPE_NFLOAT
 %type 	<numVal> 	operand arithmetic_expression_1 arithmetic_expression_2 arithmetic_expression_3 arithmetic_expression_4 arithmetic_expression_5 arithmetic_expression_6 arithmetic_expression_term arithmetic_expression_term_2  
 %type 	<numVal> 	logical_expression_1
-%type	<stringVal>     string_operations_1 string_operations_2 string_operations_term function_call function_call_header
+%type	<stringVal>     variable_operation_operand string_operations_1 string_operations_2 string_operations_term function_call function_call_header	
 
 %left 	ADD SUB MUL DIV MOD BIT_XOR BIT_AND BIT_OR BIT_SHL BIT_SHR
 %left 	NOT
@@ -434,8 +443,17 @@ variables_operations			: variables_operations COMMA variable_operation	{ }
 					| variable_operation				{ }
 					;
 
-variable_operation			: variable_operation_operand OP_EQUALS arithmetic_expression_1 	{ }
-					| variable_operation_operand OP_EQUALS logical_expression_1	{ }
+variable_operation			: variable_operation_operand OP_EQUALS arithmetic_expression_1 	{ 
+						if (checkOperationVarType(getOperandType($1),0)) {
+							//ceva
+						}
+					}
+					| variable_operation_operand OP_EQUALS logical_expression_1	{ checkOperationVarType(getOperandType($1),1); }
+					| variable_operation_operand OP_EQUALS TYPE_STR			{ checkOperationVarType(getOperandType($1),2); }
+					| variable_operation_operand OP_EQUALS TYPE_NFLOAT		{ checkOperationVarType(getOperandType($1),3); }
+					| variable_operation_operand OP_EQUALS TYPE_CHAR		{ checkOperationVarType(getOperandType($1),4); }
+					| variable_operation_operand OP_EQUALS DOLLAR function_call	{ checkOperationVarType(getOperandType($1),getFunctionReturnType($4)); }
+					| variable_operation_operand OP_EQUALS DOLLAR ID		{ checkOperationVarType(getOperandType($1),getVariableType($4)); }
 					| variable_operation_operand OP_ADDEQ arithmetic_expression_1 	{ }
 					| variable_operation_operand OP_SUBEQ arithmetic_expression_1 	{ }
 					| DADD variable_operation_operand 	 			{ }
@@ -444,8 +462,8 @@ variable_operation			: variable_operation_operand OP_EQUALS arithmetic_expressio
 					| variable_operation_operand DSUB	 			{ }
 					;
 
-variable_operation_operand		: ID					{ }
-					| ID O_BRACKET TYPE_NUM C_BRACKET	{ }
+variable_operation_operand		: ID					{ $$ = $1; }
+					| ID O_BRACKET TYPE_NUM C_BRACKET	{ $$ = buildArrayPositionString($1, $3); }
 					;
 
 arithmetic_expression_1				: arithmetic_expression_1 BIT_OR arithmetic_expression_2        { $$ = $1 | $3; }
@@ -816,6 +834,21 @@ bool checkVariables(uchar varType) {
 	toCheckVars.clear();
 }
 
+bool checkVariableExistence(char* variableName) {
+	string name(variableName);
+	if (functionParsing) {
+		if (localV.count(name)) {
+			return true;
+		}
+	}
+	if (customTypeParsing) {
+	 	if (customTypeVars.count(name)) {
+			return true;
+		}
+	}
+	return globalV.count(name) == 1;
+}
+
 bool checkArrays(uchar arrayType) {
         for (auto var : toCheckArrays) {
                 declareArray(var.first, arrayType, var.second, customTypeParsing, functionParsing);
@@ -937,7 +970,7 @@ bool setVariableValue(char *variableName, int value) {
 		res = true;
 		globalV[name].first.intUnionMember.intVal = value;
 	}
-	return true;
+	return res;
 }
 
 int getVariableValue(char *variableName) {
@@ -1021,6 +1054,26 @@ void printGlobalArrays() {
 	std::cout<<'\n';
 }
 
+uchar getOperandType(char *operandStr) {
+	if (operandStr == NULL) {
+	 	return NO_VAR;
+	}
+        arrayPosition = -1;
+	if (*operandStr >= '0' && *operandStr <= '9') {
+		arrayPosition = 0;
+		int posLen = 0;
+		while (operandStr[posLen] && operandStr[posLen] >= '0' && operandStr[posLen] <= '9') {
+			arrayPosition = arrayPosition * 10 + (operandStr[posLen] - '0');
+			++posLen;
+		}
+		operandName = string(operandStr + posLen);
+		return getArrayType(operandStr + posLen);	
+	} else {
+		operandName = string(operandStr);
+		return getVariableType(operandStr);
+	}
+}
+
 uchar getVariableType(char *variableName) {
 	string name(variableName);
 	if (functionParsing) {
@@ -1038,6 +1091,57 @@ uchar getVariableType(char *variableName) {
 		return getTypeFromTypeName(globalV[name].second); 
 	}
 	return NO_VAR;	
+}
+
+uchar getArrayType(char *arrayName) {
+	string name(arrayName);
+	if (functionParsing) {
+		if (localArrs.count(name)) {
+			return getTypeFromTypeName(localArrs[name].second.first);
+		}
+	}
+	if (customTypeParsing) {
+		if (customTypeArrs.count(name)) {
+			std::cout<<name<<" found\n";
+			return 0;
+		}
+	}
+	if (globalArrs.count(name)) {
+		return getTypeFromTypeName(globalArrs[name].second.first);
+	}
+	return NO_ARR;
+}
+
+int digitsCount(int x) {
+	if (!x) return 1;
+	int res = 0;
+	while (x) ++res, x /= 10;
+	return res;
+}
+
+char* buildArrayPositionString(char* arrayName, int position) {
+        int posLen = digitsCount(position), len = posLen + strlen(arrayName) + 1;
+	char* res = new char[len];
+	if (!position) {
+		*res = '0';
+	} else {
+		int pos = 0;
+	 	while (position) {
+			res[pos++] = '0'+position%10;
+			position /= 10;
+		}
+	}
+	strcpy(res+posLen, arrayName);
+	return res;
+}
+
+bool checkOperationVarType(uchar varType, uchar expectedType) {
+        bool res = true;
+	if (varType != expectedType) {
+		res = false;
+		printError("Invalid type for an operation on variable/array \"%s\"!\n", operandName.c_str());
+	}
+	return res;
 }
 
 void initCustomType(char* customTypeName) {
