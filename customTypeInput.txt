@@ -1,0 +1,12 @@
+defType myType -> {
+	def str = "asd"-> string;
+	func firstFun() -> void { }
+	func secondFun() -> void { }
+	def arr[100], vr -> int;
+	def sth = 421.04 -> float;
+	def const boolMember = false -> bool;
+}
+
+main -> void {
+	return;
+}

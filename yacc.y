@@ -2,12 +2,13 @@
 #include 	<stdio.h>
 #include 	<string.h>
 #include 	<unordered_map>
+#include 	<unordered_set>
 #include 	<string>
 #include 	<vector>
 #include 	<utility>
 #include 	<iostream>
 #include 	<iomanip>
-#include 	<cstdarg>  
+#include 	<cstdarg>        
 #include 	<windows.h>                            
 #define uint 	unsigned int
 #define uchar 	unsigned char
@@ -17,6 +18,7 @@
 #define pb 	push_back
 #define mp 	make_pair
 #define umap	std::unordered_map
+#define uset	std::unordered_set
 #define ERRORR 	2147483639                                     
 
 extern int yylineno;
@@ -25,7 +27,7 @@ int yylex();
           
 const char *dotsLineStr = "---------------------------------------------------------\n";
              
-int customStructureParsing;
+int customTypeParsing;
 int functionParsing;
                                                 
 // Functions parsing:
@@ -55,7 +57,7 @@ struct functionInfo {
 	string name, type;
 	
 	bool operator==(const functionInfo& other) {
-		if (arguments.size() != other.arguments.size()) {
+		if (arguments.size() != other.arguments.size() || name != other.name) {
 			return false;
 		}               
 		for (int i=0;i<arguments.size();++i) {
@@ -77,8 +79,8 @@ pair<string,string>			thisFunctionInfo;
 functionArgUnion 	getFunctionArgUnion(uchar predefinedValueType, void *predefinedValue);
 bool 			initFunctionArgsLogic(char* argName, uchar predefinedValueType, void *predefinedValue);
 bool	 		addFunctionArg(char *argName, uchar predefinedValueType, void *predefinedValue);
-int 			printFunctionInfo();
-bool			saveFunctionInfo();
+int 			printFunctionInfo(int functionInCustomType);
+bool			saveFunctionInfo(int functionInCustomType);
 void 			printFunctionArg(const pair<string,functionArgUnion> &arg);
 bool 			clearFunctionArgsArray();
 bool 			clearFunctionArgsLogic();
@@ -120,6 +122,16 @@ union variableValueUnion {
 	VARIABLE_VALUE(char,charVal,charUnionMember);
 };
 
+struct variableInfo {
+	variableInfo(const variableValueUnion& val, const string& nm, const string& tp) {
+	 	value = val;
+		name = nm;
+		type = tp;
+	}
+	variableValueUnion value;
+	string name, type;
+};
+
 vector<pair<string,variableDeclUnion>>			toCheckVars;
 vector<pair<string,int>>				toCheckArrays;
 umap<char,uchar>					varDeclType;
@@ -133,8 +145,8 @@ bool 	checkArrays(uchar arrayType);
 void 	printVariableInfo(const string& name, const string& type, const variableValueUnion& varInfo); 
 void	printArrayInfo(const string& name, const string& type, int size); 
 string	getTypeName(uchar type, bool isConst = false);
-bool 	declareVariable(const string& name, const variableDeclUnion& declUnion, int local, bool isConst);
-bool 	declareArray(const string& name, uchar arrayType, uint arraySize, int local = 1);
+bool 	declareVariable(const string& name, const variableDeclUnion& declUnion, int inCustomType, int local, bool isConst);
+bool 	declareArray(const string& name, uchar arrayType, uint arraySize, int inCustomType, int local = 1);
 bool    setVariableValue(char *variableName, int value);
 int 	getVariableValue(char *variableName);           
 bool 	setArrayValue(char *arrayName, uint pos, int value);
@@ -143,9 +155,27 @@ void 	clearLocalVariables();
 void	printGlobalVariables();
 void	printGlobalArrays();
 
-void initFunctionArgsLogic();
-void initVarDeclLogic();
-void init();
+// Custom types parsing:
+
+struct customTypeInfo {
+	vector<functionInfo> 				functions;
+	vector<variableInfo> 				variables;
+	vector<pair<pair<string,string>,int>>		arrays;
+	string name;
+};
+
+customTypeInfo 		thisCustomType;
+vector<customTypeInfo>	programCustomTypes;
+uset<string>		customTypeVars, customTypeArrs;
+
+void 	initCustomType(char* customTypeName);
+void	printCustomTypeVariables();
+void	printCustomTypeArrays();
+void 	saveThisCustomType();
+
+void 	initFunctionArgsLogic();
+void 	initVarDeclLogic();
+void 	init();
 
 void	printError(const char*format, ...);
 
@@ -191,8 +221,8 @@ definitions				: definitions function_declaration		{ }
 					;
 
 function_declaration			: function_header instructions_block	{ 
-						if (saveFunctionInfo()) {
-						 	printFunctionInfo();
+						if (saveFunctionInfo(customTypeParsing)) {
+						 	printFunctionInfo(customTypeParsing);
 						} 
 						clearFunctionArgsLogic();
 						clearLocalVariables();
@@ -225,8 +255,16 @@ function_parameters_def_values		: function_parameters_def_values COMMA TYPE ID O
 					| TYPE ID OP_EQUALS TYPE_CHAR						{ initFunctionArgsLogic($2, 4, (void*)&$4); }
 					;                                                                       
 
-custom_type_declaration			: DEFTYPE ID ARROW O_BRACE custom_type_body C_BRACE	{ }
-					| DEFTYPE ID ARROW O_BRACE C_BRACE			{ }
+custom_type_declaration			: custom_type_header ARROW O_BRACE custom_type_body C_BRACE	{ 
+						printCustomTypeVariables(); 
+						printCustomTypeArrays(); 
+						saveThisCustomType(); 
+						customTypeParsing = 0; 
+						}
+					| custom_type_header ARROW O_BRACE C_BRACE			{ customTypeParsing = 0; }
+					;
+
+custom_type_header			: DEFTYPE ID 						{ customTypeParsing = 1; initCustomType($2); }
 					;
 					
 custom_type_body			: custom_type_body custom_type_body_declaration		{ }
@@ -526,9 +564,15 @@ bool addFunctionArg(char *argName, uchar predefinedValueType, void *predefinedVa
 	return true;
 }
 
-int printFunctionInfo() {
-	std::cout<<dotsLineStr;
- 	std::cout<<"Function name: "<<thisFunctionInfo.first<<'\n';
+int printFunctionInfo(int functionInCustomType) {
+	if (!functionInCustomType) {
+		std::cout<<dotsLineStr;
+	}
+ 	std::cout<<"Function name: ";
+	if (functionInCustomType) {
+		std::cout<<thisCustomType.name<<'.';
+	} 
+	std::cout<<thisFunctionInfo.first<<'\n';
 	std::cout<<"Function return value: "<<thisFunctionInfo.second<<'\n';
 	std::cout<<"Number of arguments: "<< thisFunctionArgs.size()<<'\n';
 	for (uint i=0;i<thisFunctionArgs.size();++i) {
@@ -568,19 +612,33 @@ void printFunctionArg(const pair<string,functionArgUnion> &arg) {
 	std::cout<<'\n';
 }
 
-bool saveFunctionInfo() {
+bool saveFunctionInfo(int functionInCustomType) {
 	functionInfo newFunction(thisFunctionArgs, thisFunctionInfo.first, thisFunctionInfo.second);
 	bool good = true;
-	for (int i=0;i<programFunctions.size();++i) {
-	 	if (programFunctions[i] == newFunction) {
-	 		good = false;
-			break;
+	if (functionInCustomType) {
+	        for (int i=0;i<thisCustomType.functions.size();++i) {
+	         	if (thisCustomType.functions[i] == newFunction) {
+			      	good = false;
+				break;
+			}
 		}
-	}
-	if (good) {
-	 	programFunctions.pb(newFunction);
+		if (good) {
+		 	thisCustomType.functions.pb(newFunction);
+		} else {
+		 	printError("Error when declaring the function named \"%s\" in custom type \"%s\"! Another function with the same signature was previously defined!\n", thisFunctionInfo.first.c_str(), thisCustomType.name.c_str());
+		}
 	} else {
-	 	printError("Error when declaring the function named \"%s\"! Another function with the same signature was previously defined!\n", thisFunctionInfo.first.c_str());
+		for (int i=0;i<programFunctions.size();++i) {
+		 	if (programFunctions[i] == newFunction) {
+		 		good = false;
+				break;
+			}
+		}
+		if (good) {
+		 	programFunctions.pb(newFunction);
+		} else {
+		 	printError("Error when declaring the function named \"%s\"! Another function with the same signature was previously defined!\n", thisFunctionInfo.first.c_str());
+		}
 	}
 	return good;
 }
@@ -666,14 +724,14 @@ bool checkVariables(uchar varType) {
 				continue;
 			}              
 		}
-		declareVariable(var.first, var.second, functionParsing, var.second.intUnionMember.isConst); 	 	                           
+		declareVariable(var.first, var.second, customTypeParsing, functionParsing, var.second.intUnionMember.isConst); 	 	                           
 	}
 	toCheckVars.clear();
 }
 
 bool checkArrays(uchar arrayType) {
         for (auto var : toCheckArrays) {
-                declareArray(var.first, arrayType, var.second, functionParsing);
+                declareArray(var.first, arrayType, var.second, customTypeParsing, functionParsing);
 	}
 	toCheckArrays.clear();
 }
@@ -711,9 +769,12 @@ string getTypeName(uchar type, bool isConst) {
 	return res;
 }
 
-bool declareVariable(const string& name, const variableDeclUnion& declUnion, int local, bool isConst) {	
+bool declareVariable(const string& name, const variableDeclUnion& declUnion, int inCustomType, int local, bool isConst) {	
 	if (local == 1 && localV.count(name)) {
 		printError("Local variable \"%s\" was previously defined!\n", name.c_str());
+		return false;
+	} else if (local == 0 && inCustomType && customTypeVars.count(name)) {
+                printError("A variable with name \"%s\" was previously defined in custom type \"%s\"!\n", thisCustomType.name.c_str(), name.c_str());
 		return false;
 	} else if (local == 0 && globalV.count(name)) {
 		printError("Global variable \"%s\" was previously defined!\n", name.c_str());
@@ -733,17 +794,23 @@ bool declareVariable(const string& name, const variableDeclUnion& declUnion, int
 	}
 	if (local == 1) {
 		localV[name] = mp(value,type);
+	} else if (local == 0 && inCustomType == 1) {
+		variableInfo varInfo(value, name, type);
+	        thisCustomType.variables.pb(varInfo);
 	} else {
 		globalV[name] = mp(value,type);
 	}
 	return true;
 }
 
-bool declareArray(const string& name, uchar arrayType, uint arraySize, int local) {       
+bool declareArray(const string& name, uchar arrayType, uint arraySize, int inCustomType, int local) {       
 	if (local == 1 && localArrs.count(name)) {
 		printError("Local array \"%s\" was previously defined!\n", name.c_str());
 		return false;
-	} else if (local == 0 && globalArrs.count(name)) {  
+	} else if (local == 0 && inCustomType == 1 && customTypeArrs.count(name)) {
+        	printError("An array with name \"%s\" was previously defined in custom type \"%s\"!\n", thisCustomType.name.c_str(), name.c_str());
+		return false;
+	} else if (local == 0 && inCustomType == 0 && globalArrs.count(name)) {  
 		printError("Global array \"%s\" was previously defined!\n", name.c_str());
 		return false;
 	}
@@ -754,6 +821,8 @@ bool declareArray(const string& name, uchar arrayType, uint arraySize, int local
 	}  
 	if (local == 1) {
 		localArrs[name] = mp(arr,mp(type,arraySize));
+	} else if (local == 0 && inCustomType == 1) {
+	        thisCustomType.arrays.pb(mp(mp(name, type),arraySize));
 	} else {
 		globalArrs[name] = mp(arr,mp(type,arraySize));
 	}
@@ -824,7 +893,7 @@ void printGlobalVariables() {
 	if (!globalV.size()) {
 		return;
 	}
-	std::cout<<dotsLineStr<<"Global variables:\n";
+	std::cout<<dotsLineStr<<"Global variables:\n\n";
 	for (auto& var : globalV) {
 	 	printVariableInfo(var.first, var.second.second, var.second.first);
 	}
@@ -835,11 +904,47 @@ void printGlobalArrays() {
 	if (!globalArrs.size()) { 
 		return;
 	}
-	std::cout<<dotsLineStr<<"Global arrays:\n";
+	std::cout<<dotsLineStr<<"Global arrays:\n\n";
 	for (auto& arr : globalArrs) {
 	 	printArrayInfo(arr.first, arr.second.second.first, arr.second.second.second);
 	}
 	std::cout<<'\n';
+}
+
+void initCustomType(char* customTypeName) {
+	string name(customTypeName);
+	thisCustomType.name = customTypeName;
+	std::cout<<dotsLineStr<<dotsLineStr<<"Custom type: "<<name<<"\n\n";
+}
+
+void printCustomTypeVariables() {
+	if (!thisCustomType.variables.size()) {
+		return;
+	}
+        std::cout<<thisCustomType.name<<" members (variables):\n";
+	for (auto& var : thisCustomType.variables) {
+		printVariableInfo(var.name, var.type, var.value);
+	}
+	std::cout<<'\n';
+}
+
+void printCustomTypeArrays() {
+	if (!thisCustomType.arrays.size()) {
+		return;
+	}
+	std::cout<<thisCustomType.name<<" members (arrays):\n";
+	for (auto& arr : thisCustomType.arrays) {
+	        printArrayInfo(arr.first.first, arr.first.second, arr.second);
+	}
+	std::cout<<'\n';
+}
+
+void saveThisCustomType() {
+	programCustomTypes.pb(thisCustomType);
+	thisCustomType.functions.clear();
+	thisCustomType.variables.clear();
+	customTypeVars.clear();
+	customTypeArrs.clear();
 }
 
 void initFunctionArgsLogic() {
