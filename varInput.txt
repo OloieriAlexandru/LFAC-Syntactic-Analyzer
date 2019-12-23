@@ -1,6 +1,6 @@
 def intVar = 10, intArray[5] -> int;
 def boolVar = true, boolArray[5] -> bool;
-def strVar = "str", strArray[5] -> string;
+def strVar = "str", strArray[5], d -> string;
 def floatVar = 10.0, floatArray[5] -> float;
 def charVar = 'a', charArray[5] -> char;
 

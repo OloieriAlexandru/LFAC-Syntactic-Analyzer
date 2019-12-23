@@ -75,7 +75,8 @@ vector<functionInfo>			programFunctions;
 int 					functionArgsLogicInit;
 umap<char,uchar>			functionArgType;
 vector<pair<string,functionArgUnion>> 	thisFunctionArgs;
-pair<string,string>			thisFunctionInfo;
+pair<string,string>			thisFunctionInfo;      
+uset<string>				functionArgsVarsCheck;
 functionArgUnion 	getFunctionArgUnion(uchar predefinedValueType, void *predefinedValue);
 bool 			initFunctionArgsLogic(char* argName, uchar predefinedValueType, void *predefinedValue);
 bool	 		addFunctionArg(char *argName, uchar predefinedValueType, void *predefinedValue);
@@ -176,7 +177,9 @@ void 	saveThisCustomType();
 void 	initFunctionArgsLogic();
 void 	initVarDeclLogic();
 void 	init();
-
+                                             
+void 	printEvalResult(void* result, const char* type);
+void 	printEvalWrongType(const char* type);
 void	printError(const char*format, ...);
 
 %}
@@ -189,20 +192,21 @@ void	printError(const char*format, ...);
 }
 
 %start 	check
-%token  MAIN IF ELSE FOR WHILE DO RETURN DEFTYPE OBJECT CONSTT FUNC DEF ARROW O_PAR C_PAR O_BRACE C_BRACE EQUALS NOT_EQUALS OP_EQUALS OP_ADDEQ OP_SUBEQ DOT SEMICOLON DADD DSUB COMMA COLON O_BRACKET C_BRACKET 
-%token  <numVal> TYPE_NUM TYPE_BOOL
-%token 	<charVal> TYPE_CHAR
-%token 	<stringVal> TYPE_STR TYPE ID
-%token  <floatVal> TYPE_NFLOAT
-%type 	<numVal> operand arithmetic_expression_1 arithmetic_expression_2 arithmetic_expression_3 arithmetic_expression_4 arithmetic_expression_5 arithmetic_expression_6 arithmetic_expression_term arithmetic_expression_term_2  
-%type 	<numVal> logical_expression_1
+%token  MAIN IF ELSE FOR WHILE DO RETURN DEFTYPE OBJECT CONSTT FUNC DEF EVAL ARROW O_PAR C_PAR O_BRACE C_BRACE EQUALS NOT_EQUALS OP_EQUALS OP_ADDEQ OP_SUBEQ DOT SEMICOLON DADD DSUB COMMA COLON O_BRACKET C_BRACKET 
+%token  <numVal> 	TYPE_NUM TYPE_BOOL
+%token 	<charVal> 	TYPE_CHAR
+%token 	<stringVal> 	TYPE_STR TYPE ID
+%token  <floatVal> 	TYPE_NFLOAT
+%type 	<numVal> 	operand arithmetic_expression_1 arithmetic_expression_2 arithmetic_expression_3 arithmetic_expression_4 arithmetic_expression_5 arithmetic_expression_6 arithmetic_expression_term arithmetic_expression_term_2  
+%type 	<numVal> 	logical_expression_1
+%type	<stringVal>     string_operations_1 string_operations_2 string_operations_term
 
-%left ADD SUB MUL DIV MOD BIT_XOR BIT_AND BIT_OR BIT_SHL BIT_SHR
-%left NOT
-%left AND
-%left OR
-%left EQUALS NOT_EQUALS GT GET LT LET
-
+%left 	ADD SUB MUL DIV MOD BIT_XOR BIT_AND BIT_OR BIT_SHL BIT_SHR
+%left 	NOT
+%left 	AND
+%left 	OR
+%left 	EQUALS NOT_EQUALS GT GET LT LET
+                                        
 %%
 
 check					: program				{ printf("Program corect sintactic!\n"); }
@@ -227,7 +231,7 @@ function_declaration			: function_header instructions_block	{
 						clearFunctionArgsLogic();
 						clearLocalVariables();
 						functionParsing = 0;
-						}
+					}
 					;
 
 function_header				: FUNC ID O_PAR function_parameters C_PAR ARROW TYPE	{ thisFunctionInfo = mp(string($2), string($7)); functionParsing = 1; }
@@ -260,7 +264,7 @@ custom_type_declaration			: custom_type_header ARROW O_BRACE custom_type_body C_
 						printCustomTypeArrays(); 
 						saveThisCustomType(); 
 						customTypeParsing = 0; 
-						}
+					}
 					| custom_type_header ARROW O_BRACE C_BRACE			{ customTypeParsing = 0; }
 					;
 
@@ -299,6 +303,17 @@ instruction				: instructions_block			{ }
 					| for_loop				{ }
 					| while_loop				{ }
 					| do_while_loop				{ }
+					| eval_expr				{ }
+					;
+
+eval_expr				: eval_expr_call SEMICOLON			{ }
+					;
+
+eval_expr_call				: EVAL O_PAR arithmetic_expression_1 C_PAR	{ printEvalResult((void*)&$3, "int"); }
+					| EVAL O_PAR logical_expression_1 C_PAR		{ printEvalResult((void*)&$3, "bool"); }
+					| EVAL O_PAR string_operations_1 C_PAR		{ printEvalResult((void*)$3, "string"); }
+					| EVAL O_PAR TYPE_NFLOAT C_PAR			{ printEvalWrongType("float"); }
+					| EVAL O_PAR TYPE_CHAR C_PAR			{ printEvalWrongType("char"); }
 					;
 
 return_statement_full			: return_statement SEMICOLON		{ }
@@ -490,6 +505,30 @@ logical_expression_operand			: TYPE_BOOL                                        
 						| arithmetic_expression_1                                       { }
 						;
 
+string_operations_1				: string_operations_1 DADD string_operations_2		{ 
+                                                        int len1 = strlen($1), len2 = strlen($3), len3 = len1 + len2;
+							$$ = new char[len3 + 1];
+							strcpy($$, $1);
+							strcpy($$+len1, $3);
+						}
+						| string_operations_2					{ $$ = $1; }
+						;
+
+string_operations_2				: string_operations_term MUL arithmetic_expression_1	{ 
+                                                        int len1 = strlen($1), finalLen = len1 * $3;
+							$$ = new char[finalLen + 1];
+							if ($$ != NULL) {
+                                                		for (int i=0;i<$3;++i) strcpy($$+i*len1, $1);
+							}
+						}
+						| string_operations_term				{ $$ = $1; }
+						;
+
+string_operations_term				: O_PAR string_operations_1 C_PAR			{ $$ = $2; }
+						| TYPE_STR						{ $$ = $1; }
+						| ARROW ID						{ }
+						;
+
 function_call_full				: function_call SEMICOLON					{ }
 						;
 
@@ -546,6 +585,7 @@ functionArgUnion getFunctionArgUnion(uchar predefinedValueType, void *predefined
 bool initFunctionArgsLogic(char* argName, uchar predefinedValueType, void *predefinedValue) {       
 	if (!functionArgsLogicInit) {
 		clearFunctionArgsArray();
+		functionArgsVarsCheck.clear();
 		functionArgsLogicInit = 1;
 	}
 	if (argName == 0) {
@@ -560,7 +600,8 @@ bool addFunctionArg(char *argName, uchar predefinedValueType, void *predefinedVa
 	}
 	string name(argName);
 	functionArgUnion fArg = getFunctionArgUnion(predefinedValueType, predefinedValue);
-	thisFunctionArgs.pb(mp(name,fArg));	
+	thisFunctionArgs.pb(mp(name,fArg));
+	functionArgsVarsCheck.insert(name);	
 	return true;
 }
 
@@ -604,7 +645,7 @@ void printFunctionArg(const pair<string,functionArgUnion> &arg) {
 	switch(arg.second.type) {
 	 	case 0: std::cout<<arg.second.intUnionMember.intVal; break;
 		case 1: std::cout<<arg.second.boolUnionMember.boolVal ? "true" : "false"; break;
-		case 2: std::cout<<arg.second.stringUnionMember.stringVal; break;
+		case 2: if (arg.second.stringUnionMember.stringVal) std::cout<<'\''<<arg.second.stringUnionMember.stringVal<<'\''; break;
 		case 3: std::cout<<std::setprecision(3)<<std::fixed<<arg.second.floatUnionMember.floatVal; break;
 		case 4: std::cout<<'\''<<arg.second.charUnionMember.charVal<<'\''; break;
 		default:std::cout<<"none"; break;
@@ -741,7 +782,7 @@ void printVariableInfo(const string& name, const string& type, const variableVal
 	switch(varInfo.type) {
 		case 0: std::cout<<varInfo.intUnionMember.intVal; break;
 		case 1: std::cout<<varInfo.boolUnionMember.boolVal; break;
-		case 2: std::cout<<varInfo.stringUnionMember.stringVal; break;
+		case 2: if (varInfo.stringUnionMember.stringVal) std::cout<<'\''<<varInfo.stringUnionMember.stringVal<<'\''; break;
 		case 3: std::cout<<std::setprecision(3)<<std::fixed<<varInfo.floatUnionMember.floatVal; break;
 		case 4: std::cout<<'\''<<varInfo.charUnionMember.charVal<<'\''; break;
 		default:break;
@@ -847,6 +888,9 @@ int getVariableValue(char *variableName) {
 	if (localV.count(name)){
 		return localV[name].first.intUnionMember.intVal;
 	}
+	if (functionParsing && functionArgsVarsCheck.count(name)) {
+	 	return 0; 
+	}
 	if (globalV.count(name)){
 		return globalV[name].first.intUnionMember.intVal;
 	}                                                                          
@@ -875,10 +919,15 @@ int getArrayValue(char *arrayName, uint pos) {
 		if (pos < localArrs[name].second.second) {
 			return localArrs[name].first[pos];	
 		}
-	} else if (globalArrs.count(name)) {
+		printError("Index %d out of band for arrays \"%s\"!\n", pos, name.c_str());
+		return ERROR;
+	}
+	if (globalArrs.count(name)) {
 	 	if (pos < globalArrs[name].second.second) {
 		        return globalArrs[name].first[pos];
 		}
+		printError("Index %d out of band for arrays \"%s\"!\n", pos, name.c_str());
+		return ERROR;
 	}
 	printError("The array \"%s\" was not declared in the program!\n", name.c_str());
 	return ERRORR;
@@ -943,6 +992,7 @@ void saveThisCustomType() {
 	programCustomTypes.pb(thisCustomType);
 	thisCustomType.functions.clear();
 	thisCustomType.variables.clear();
+	thisCustomType.arrays.clear();
 	customTypeVars.clear();
 	customTypeArrs.clear();
 }
@@ -959,6 +1009,27 @@ void init() {
  	initFunctionArgsLogic();
 	initVarDeclLogic();
 }               
+
+void printEvalResult(void* result, const char* type) {
+	if (type == NULL || strlen(type) < 1) {
+		printError("Internal error!\n");
+		return;
+	}                  
+	if (*type == 'i') {
+		int* 	intPointer = (int*)result;
+		printf("Line %d eval: int expr = %d\n", yylineno, *intPointer);
+	} else if (*type == 'b') {
+	        int*	intPointer = (int*)result;
+		printf("Line %d eval: bool expr = %s\n", yylineno, *intPointer ? "true" : "false");
+	} else {
+	        char* 	strPointer = (char*)result;
+		printf("Line %d eval: string expr = %s\n", yylineno, strPointer);
+	}                                              
+}
+
+void printEvalWrongType(const char* type) {
+	printf("Line %d eval: invalid type, \"int\" expected, found: %s\n", yylineno, type);
+}
 
 void printError(const char*format, ...) {
  	HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);

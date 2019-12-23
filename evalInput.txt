@@ -1,0 +1,8 @@
+
+main -> void {
+	def a = 10 -> int;
+	eval(10*a);
+	a += 4;
+	eval(10*a);
+	eval("a"++"b"*3);
+}

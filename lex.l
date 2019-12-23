@@ -21,6 +21,7 @@
 "def"					{ return DEF; }
 "object"				{ return OBJECT; }
 "const"					{ return CONSTT; }
+"eval"					{ return EVAL; }
 "->"					{ return ARROW; } 
 "{"					{ return O_BRACE; }
 "}"					{ return C_BRACE; }
@@ -56,7 +57,11 @@
 -?[0-9]([0-9]{0,9})\.[0-9]+		{ yylval.floatVal = atof(yytext); return TYPE_NFLOAT; }
 "0"|-?[1-9]([0-9]{0,8})			{ yylval.numVal = atoi(yytext); return TYPE_NUM; }
 \'.\'					{ yylval.charVal = yytext[1]; return TYPE_CHAR; }
-\"([^\"]|\n)*\"				{ yylval.stringVal = strdup(yytext); return TYPE_STR; }
+\"([^\"]|\n)*\"				{ yylval.stringVal = new char[yyleng-1]; 
+						strncpy(yylval.stringVal, yytext+1, yyleng-2); 
+						yylval.stringVal[yyleng-2] = '\0';
+						return TYPE_STR; 
+					}
 "true"|"false"				{ yylval.numVal = (yytext[0] == 't' ? 1 : 0); return TYPE_BOOL; }
 [_A-Za-z][_A-Za-z0-9]*			{ yylval.stringVal = strdup(yytext); return ID; }
 .|\n					;
