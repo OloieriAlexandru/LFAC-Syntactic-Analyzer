@@ -1,0 +1,22 @@
+def b -> bool;
+func fStr() -> string { }
+func fInt() -> int { }
+func fBool() -> bool { }
+func fFloat() -> float { }
+func fChar() -> char { }
+
+func f ( int a, bool b, int d) -> string { }
+func allTypeF (int a, bool b, string c, float d, char e) -> void { }
+func allTypeF (int a, string b, bool c, float d, char e = 'f') -> void { }
+
+func fPredefinedValues (string c = "asd", char v = 'v', int a = 6) -> void { }
+
+main -> void {
+	def a -> int;
+	def const c = 10 -> int;
+	f(($c, $b, $a));
+	allTypeF(($fInt(()),$fBool(()),$f(($c,$b,$fInt(()))),$fFloat(()),$fChar(())));
+	allTypeF(($fInt(()),$fBool(()),$fStr(()),$fFloat(())));
+	allTypeF((10,true,"asd",421.4,'a'));
+	fPredefinedValues(());	
+}

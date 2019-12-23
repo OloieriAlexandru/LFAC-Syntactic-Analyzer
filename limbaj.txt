@@ -43,5 +43,7 @@ def object ID = { attributeID1 : value, attributeID2 : value } -> type;
 	return expression;
 
 ### Function call:
-* functionID (( callParameters ))
+* functionID (( callParameters )) -> arithmetic_expreesion, int type
 * object::functionID (( callParameters ))
+* $functionID (( callParameters )) -> normal_function_call, any type
+* $object::functionID (( callParameters )) 

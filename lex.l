@@ -53,7 +53,8 @@
 ","					{ return COMMA; } 
 ":"					{ return COLON; }  
 "["					{ return O_BRACKET; }
-"]"					{ return C_BRACKET; }  
+"]"					{ return C_BRACKET; }
+"$"					{ return DOLLAR; }  
 -?[0-9]([0-9]{0,9})\.[0-9]+		{ yylval.floatVal = atof(yytext); return TYPE_NFLOAT; }
 "0"|-?[1-9]([0-9]{0,8})			{ yylval.numVal = atoi(yytext); return TYPE_NUM; }
 \'.\'					{ yylval.charVal = yytext[1]; return TYPE_CHAR; }

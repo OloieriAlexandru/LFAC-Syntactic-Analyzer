@@ -6,6 +6,7 @@
 #include 	<string>
 #include 	<vector>
 #include 	<utility>
+#include 	<stack>
 #include 	<iostream>
 #include 	<iomanip>
 #include 	<cstdarg>        
@@ -18,8 +19,12 @@
 #define pb 	push_back
 #define mp 	make_pair
 #define umap	std::unordered_map
-#define uset	std::unordered_set
-#define ERRORR 	2147483639                                     
+#define uset	std::unordered_set 
+#define stack	std::stack
+#define ERRORR 	2147483639
+#define T_VOID	100
+#define NO_VAR	101
+#define NO_FUN	102                                     
 
 extern int yylineno;
 void yyerror(const char *str) { printf("%s %d\n", str, yylineno); }
@@ -76,7 +81,7 @@ int 					functionArgsLogicInit;
 umap<char,uchar>			functionArgType;
 vector<pair<string,functionArgUnion>> 	thisFunctionArgs;
 pair<string,string>			thisFunctionInfo;      
-uset<string>				functionArgsVarsCheck;
+umap<string,uchar>			functionArgsVarsCheck;
 functionArgUnion 	getFunctionArgUnion(uchar predefinedValueType, void *predefinedValue);
 bool 			initFunctionArgsLogic(char* argName, uchar predefinedValueType, void *predefinedValue);
 bool	 		addFunctionArg(char *argName, uchar predefinedValueType, void *predefinedValue);
@@ -86,7 +91,9 @@ void 			printFunctionArg(const pair<string,functionArgUnion> &arg);
 bool 			clearFunctionArgsArray();
 bool 			clearFunctionArgsLogic();
 
-void 			checkNormalFunctionCall(char *functionName);
+stack<vector<uchar>>	functionCallArgumentsType;
+uchar			getFunctionReturnType(char *functionName);
+void 			checkFunctionCall(char *functionName);
 void			clearFunctionCallArguments();
             
 // Variables, arrays parsing:
@@ -146,6 +153,7 @@ bool 	checkArrays(uchar arrayType);
 void 	printVariableInfo(const string& name, const string& type, const variableValueUnion& varInfo); 
 void	printArrayInfo(const string& name, const string& type, int size); 
 string	getTypeName(uchar type, bool isConst = false);
+uchar 	getTypeFromTypeName(const string& typeName);
 bool 	declareVariable(const string& name, const variableDeclUnion& declUnion, int inCustomType, int local, bool isConst);
 bool 	declareArray(const string& name, uchar arrayType, uint arraySize, int inCustomType, int local = 1);
 bool    setVariableValue(char *variableName, int value);
@@ -155,6 +163,7 @@ int 	getArrayValue(char *arrayName, uint pos);
 void 	clearLocalVariables();
 void	printGlobalVariables();
 void	printGlobalArrays();
+uchar	getVariableType(char *variableName);
 
 // Custom types parsing:
 
@@ -192,14 +201,14 @@ void	printError(const char*format, ...);
 }
 
 %start 	check
-%token  MAIN IF ELSE FOR WHILE DO RETURN DEFTYPE OBJECT CONSTT FUNC DEF EVAL ARROW O_PAR C_PAR O_BRACE C_BRACE EQUALS NOT_EQUALS OP_EQUALS OP_ADDEQ OP_SUBEQ DOT SEMICOLON DADD DSUB COMMA COLON O_BRACKET C_BRACKET 
+%token  MAIN IF ELSE FOR WHILE DO RETURN DEFTYPE OBJECT CONSTT FUNC DEF EVAL DOLLAR ARROW O_PAR C_PAR O_BRACE C_BRACE EQUALS NOT_EQUALS OP_EQUALS OP_ADDEQ OP_SUBEQ DOT SEMICOLON DADD DSUB COMMA COLON O_BRACKET C_BRACKET 
 %token  <numVal> 	TYPE_NUM TYPE_BOOL
 %token 	<charVal> 	TYPE_CHAR
 %token 	<stringVal> 	TYPE_STR TYPE ID
 %token  <floatVal> 	TYPE_NFLOAT
 %type 	<numVal> 	operand arithmetic_expression_1 arithmetic_expression_2 arithmetic_expression_3 arithmetic_expression_4 arithmetic_expression_5 arithmetic_expression_6 arithmetic_expression_term arithmetic_expression_term_2  
 %type 	<numVal> 	logical_expression_1
-%type	<stringVal>     string_operations_1 string_operations_2 string_operations_term
+%type	<stringVal>     string_operations_1 string_operations_2 string_operations_term function_call function_call_header
 
 %left 	ADD SUB MUL DIV MOD BIT_XOR BIT_AND BIT_OR BIT_SHL BIT_SHR
 %left 	NOT
@@ -325,7 +334,9 @@ return_statement			: RETURN return_statement_arg		{ }
 
 return_statement_arg			: logical_expression_1                          { }
 					| arithmetic_expression_1			{ }
-					| types_constants				{ }
+					| TYPE_STR					{ }
+					| TYPE_NFLOAT					{ }
+					| TYPE_CHAR					{ }
 					;					
 
 if_block				: IF O_PAR logical_expression_1 C_PAR ARROW instructions_block					{ }
@@ -532,24 +543,32 @@ string_operations_term				: O_PAR string_operations_1 C_PAR			{ $$ = $2; }
 function_call_full				: function_call SEMICOLON					{ }
 						;
 
-function_call					: ID COLON COLON ID O_PAR O_PAR function_call_args C_PAR C_PAR	{ }
-						| ID COLON COLON ID O_PAR O_PAR C_PAR C_PAR			{ }
-						| ID O_PAR O_PAR function_call_args C_PAR C_PAR			{ checkNormalFunctionCall($1); clearFunctionCallArguments(); }
-						| ID O_PAR O_PAR C_PAR C_PAR					{ checkNormalFunctionCall($1); clearFunctionCallArguments(); }
+function_call					: function_call_header O_PAR O_PAR function_call_args C_PAR C_PAR		{ $$ = $1; checkFunctionCall($1); clearFunctionCallArguments(); }
+						| function_call_header O_PAR O_PAR C_PAR C_PAR					{ $$ = $1; checkFunctionCall($1); clearFunctionCallArguments(); }
+						;
+
+function_call_header				: ID COLON COLON ID					{ 
+							int len1 = strlen($1), len2 = strlen($4);
+							$$ = new char[len1+len2+2];
+							strcpy($$,$1);
+							strcpy($$+len1,":");
+							strcpy($$+len1+1,$4);
+							functionCallArgumentsType.push(vector<uchar>());
+						}
+						| ID							{ $$ = $1; functionCallArgumentsType.push(vector<uchar>()); }
 						;
 
 function_call_args				: function_call_args COMMA function_call_arg		{ }
 						| function_call_arg					{ }
 						;
 
-function_call_arg				: logical_expression_1                          { }
-						| arithmetic_expression_1			{ }
-						| types_constants				{ }
-						;
-
-types_constants					: TYPE_STR					{ }
-						| TYPE_CHAR					{ }
-						| TYPE_NFLOAT					{ }
+function_call_arg				: arithmetic_expression_1			{ functionCallArgumentsType.top().pb(0); }
+						| logical_expression_1                          { functionCallArgumentsType.top().pb(1); }
+						| TYPE_STR					{ functionCallArgumentsType.top().pb(2); }
+						| TYPE_NFLOAT					{ functionCallArgumentsType.top().pb(3); }
+						| TYPE_CHAR					{ functionCallArgumentsType.top().pb(4); }
+						| DOLLAR ID					{ functionCallArgumentsType.top().pb(getVariableType($2)); }
+						| DOLLAR function_call				{ functionCallArgumentsType.top().pb(getFunctionReturnType($2)); }
 						;
 
 %%
@@ -601,7 +620,7 @@ bool addFunctionArg(char *argName, uchar predefinedValueType, void *predefinedVa
 	string name(argName);
 	functionArgUnion fArg = getFunctionArgUnion(predefinedValueType, predefinedValue);
 	thisFunctionArgs.pb(mp(name,fArg));
-	functionArgsVarsCheck.insert(name);	
+	functionArgsVarsCheck[name] = predefinedValueType % 5;	
 	return true;
 }
 
@@ -702,7 +721,17 @@ bool clearFunctionArgsLogic() {
 	return clearFunctionArgsArray();
 }
 
-void checkNormalFunctionCall(char *functionName) {
+uchar getFunctionReturnType(char *functionName) {
+	string name(functionName);        
+	for (int i=0;i<programFunctions.size();++i) {
+		if (programFunctions[i].name == name) {
+		 	return getTypeFromTypeName(programFunctions[i].type);
+		}
+	}
+	return NO_FUN;
+}
+
+void checkFunctionCall(char *functionName) {
 	string name(functionName);
 	int index = -1;
 	for (int i=0;i<programFunctions.size();++i) {
@@ -715,10 +744,27 @@ void checkNormalFunctionCall(char *functionName) {
 		printError("Cannot call function named \"%s\"! A function with this name was not declared!\n", name.c_str());
 		return;
 	}
+	vector<uchar> args = functionCallArgumentsType.top();
+	for (int i=index;i<programFunctions.size();++i) {
+	        if (programFunctions[i].name != name || programFunctions[i].arguments.size() < args.size()) {
+			continue;
+		}
+		bool ok = true;
+		for (int j=0;j<args.size();++j){
+			if (args[j] != programFunctions[i].arguments[j].second.type % 5) {
+				ok = false;
+				break;
+			}
+		}
+		if (ok) {
+			return;
+		}
+	}
+	printError("Invalid arguments when calling a function called \"%s\"! No matching function signature found!\n", name.c_str());
 }
 
 void clearFunctionCallArguments() {
-
+        functionCallArgumentsType.pop();
 }
 
 void addVariableToCheck(char* variableName, uchar variableType, void* variableValue, bool isConst) {
@@ -808,6 +854,17 @@ string getTypeName(uchar type, bool isConst) {
 		default:res = "error"; break;
 	}
 	return res;
+}
+
+uchar getTypeFromTypeName(const string& typeName) {
+        const char* asChar = typeName.c_str();
+	if (!strncmp(asChar,"co",2)) { // const
+	       return varDeclType[asChar[6]];	
+	} else if (asChar[0] == 'v') { 
+	       return T_VOID;
+	} else {
+	       return varDeclType[asChar[0]];
+	}
 }
 
 bool declareVariable(const string& name, const variableDeclUnion& declUnion, int inCustomType, int local, bool isConst) {	
@@ -904,10 +961,14 @@ bool setArrayValue(char *arrayName, uint pos, int value) {
 	if (localArrs.count(name)) {
 		if (pos < localArrs[name].second.second) {
 			localArrs[name].first[pos] = value;	
+		} else {
+			printError("Index %d out of bounds for local array \"%s\"!\n", pos, name.c_str());
 		}
 	} else if (globalArrs.count(name)) {
 	 	if (pos < globalArrs[name].second.second) {
 		        globalArrs[name].first[pos] = value;
+		} else {
+			printError("Index %d out of bounds for global array \"%s\"!\n", pos, name.c_str());
 		}
 	}
 	return res;
@@ -919,14 +980,14 @@ int getArrayValue(char *arrayName, uint pos) {
 		if (pos < localArrs[name].second.second) {
 			return localArrs[name].first[pos];	
 		}
-		printError("Index %d out of band for arrays \"%s\"!\n", pos, name.c_str());
+		printError("Index %d out of bounds for local array \"%s\"!\n", pos, name.c_str());
 		return ERROR;
 	}
 	if (globalArrs.count(name)) {
 	 	if (pos < globalArrs[name].second.second) {
 		        return globalArrs[name].first[pos];
 		}
-		printError("Index %d out of band for arrays \"%s\"!\n", pos, name.c_str());
+		printError("Index %d out of bounds for global array \"%s\"!\n", pos, name.c_str());
 		return ERROR;
 	}
 	printError("The array \"%s\" was not declared in the program!\n", name.c_str());
@@ -958,6 +1019,25 @@ void printGlobalArrays() {
 	 	printArrayInfo(arr.first, arr.second.second.first, arr.second.second.second);
 	}
 	std::cout<<'\n';
+}
+
+uchar getVariableType(char *variableName) {
+	string name(variableName);
+	if (functionParsing) {
+		if (localV.count(name)) {
+			return getTypeFromTypeName(localV[name].second);
+		}
+	}
+	if (customTypeParsing) {
+		if (customTypeVars.count(name)) {
+			std::cout<<name<<" found\n";
+		 	return 0;
+		}
+	}
+	if (globalV.count(name)) {
+		return getTypeFromTypeName(globalV[name].second); 
+	}
+	return NO_VAR;	
 }
 
 void initCustomType(char* customTypeName) {
