@@ -1,7 +1,14 @@
+def intVar = 10, intArray[5] -> int;
+def boolVar = true, boolArray[5] -> bool;
+def strVar = "str", strArray[5] -> string;
+def floatVar = 10.0, floatArray[5] -> float;
+def charVar = 'a', charArray[5] -> char;
 
-def a = 10, b -> int;
-
-def const testt = 10 -> int;
+def const constIntVar = -10 -> int;
+def const constBoolVar = false -> bool;
+def const constStrVar = "rts" -> string;
+def const constFloatVar = -10.0 -> float;
+def const constCharVar = 'A' -> char;
 
 func cevaFunc() -> void {
 	def b = 5.512, c -> float;

@@ -113,11 +113,11 @@ union variableDeclUnion {
 
 union variableValueUnion {
  	uchar type; // 0 - int, 1 - bool, 2 - char*, 3 - float, 4 - char
-	VARIABLE(int,intVal,intUnionMember);
-	VARIABLE(bool,boolVal,boolUnionMember);
-	VARIABLE(char*,stringVal,stringUnionMember);
-	VARIABLE(float,floatVal,floatUnionMember);
-	VARIABLE(char,charVal,charUnionMember);
+	VARIABLE_VALUE(int,intVal,intUnionMember);
+	VARIABLE_VALUE(bool,boolVal,boolUnionMember);
+	VARIABLE_VALUE(char*,stringVal,stringUnionMember);
+	VARIABLE_VALUE(float,floatVal,floatUnionMember);
+	VARIABLE_VALUE(char,charVal,charUnionMember);
 };
 
 vector<pair<string,variableDeclUnion>>			toCheckVars;
@@ -140,6 +140,8 @@ int 	getVariableValue(char *variableName);
 bool 	setArrayValue(char *arrayName, uint pos, int value);
 int 	getArrayValue(char *arrayName, uint pos);
 void 	clearLocalVariables();
+void	printGlobalVariables();
+void	printGlobalArrays();
 
 void initFunctionArgsLogic();
 void initVarDeclLogic();
@@ -176,7 +178,7 @@ void	printError(const char*format, ...);
 check					: program				{ printf("Program corect sintactic!\n"); }
 					;
 
-program					: definitions main			{ }
+program					: definitions main			{ printGlobalVariables(); printGlobalArrays(); }
 					| main					{ }
 					;
 
@@ -327,15 +329,18 @@ variable_declaration			: ID					{ addVariableToCheck($1, 5, NULL); }
 const_variables_declaration_full	: const_variables_declaration SEMICOLON				{ }
 					;
 
-const_variables_declaration		: DEF CONSTT const_variables_declaration_list ARROW TYPE	{ }
+const_variables_declaration		: DEF CONSTT const_variables_declaration_list ARROW TYPE	{ checkVariables(varDeclType[$5[0]]); }
 					;
 
 const_variables_declaration_list	: const_variables_declaration_list const_variable_declaration	{ }
 					| const_variable_declaration					{ }
 					;
 
-const_variable_declaration		: ID OP_EQUALS arithmetic_expression_1				{ }
-					| ID OP_EQUALS logical_expression_1				{ }
+const_variable_declaration		: ID OP_EQUALS arithmetic_expression_1			{ addVariableToCheck($1, 0, (void*)&$3, true); }
+					| ID OP_EQUALS logical_expression_1			{ addVariableToCheck($1, 1, (void*)&$3, true); }
+					| ID OP_EQUALS TYPE_STR                                 { addVariableToCheck($1, 2, (void*)$3, true); }
+					| ID OP_EQUALS TYPE_NFLOAT				{ addVariableToCheck($1, 3, (void*)&$3, true); }
+					| ID OP_EQUALS TYPE_CHAR				{ addVariableToCheck($1, 4, (void*)&$3, true); }
 					;
 
 custom_type_variable_declaration_full	: custom_type_variable_declaration SEMICOLON			{ }
@@ -557,7 +562,7 @@ void printFunctionArg(const pair<string,functionArgUnion> &arg) {
 		case 1: std::cout<<arg.second.boolUnionMember.boolVal ? "true" : "false"; break;
 		case 2: std::cout<<arg.second.stringUnionMember.stringVal; break;
 		case 3: std::cout<<std::setprecision(3)<<std::fixed<<arg.second.floatUnionMember.floatVal; break;
-		case 4: std::cout<<arg.second.charUnionMember.charVal; break;
+		case 4: std::cout<<'\''<<arg.second.charUnionMember.charVal<<'\''; break;
 		default:std::cout<<"none"; break;
 	}
 	std::cout<<'\n';
@@ -679,8 +684,8 @@ void printVariableInfo(const string& name, const string& type, const variableVal
 		case 0: std::cout<<varInfo.intUnionMember.intVal; break;
 		case 1: std::cout<<varInfo.boolUnionMember.boolVal; break;
 		case 2: std::cout<<varInfo.stringUnionMember.stringVal; break;
-		case 3: std::cout<<varInfo.floatUnionMember.floatVal; break;
-		case 4: std::cout<<varInfo.charUnionMember.charVal; break;
+		case 3: std::cout<<std::setprecision(3)<<std::fixed<<varInfo.floatUnionMember.floatVal; break;
+		case 4: std::cout<<'\''<<varInfo.charUnionMember.charVal<<'\''; break;
 		default:break;
 	}                    
 	std::cout<<'\n';
@@ -813,6 +818,28 @@ int getArrayValue(char *arrayName, uint pos) {
 void clearLocalVariables() {
  	localV.clear();
 	localArrs.clear();
+}
+
+void printGlobalVariables() {
+	if (!globalV.size()) {
+		return;
+	}
+	std::cout<<dotsLineStr<<"Global variables:\n";
+	for (auto& var : globalV) {
+	 	printVariableInfo(var.first, var.second.second, var.second.first);
+	}
+	std::cout<<'\n';
+}
+
+void printGlobalArrays() {
+	if (!globalArrs.size()) { 
+		return;
+	}
+	std::cout<<dotsLineStr<<"Global arrays:\n";
+	for (auto& arr : globalArrs) {
+	 	printArrayInfo(arr.first, arr.second.second.first, arr.second.second.second);
+	}
+	std::cout<<'\n';
 }
 
 void initFunctionArgsLogic() {
