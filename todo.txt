@@ -20,7 +20,7 @@
 * A variable appearing in the right side of an expression should have been initialized explicitly			- to do
 * A function is not defined more than once with the same signature							- done
 * A function that is called in the program has been defined								- done
-* The left side of an assignment has the same type as the right side							- to do
+* The left side of an assignment has the same type as the right side							- done
 * The parameters of a function call have the types from the function definition						- done
 * In any call to Eval, the parameter has type int									- done
 4) Evaluation of arithmetic expressions in a program

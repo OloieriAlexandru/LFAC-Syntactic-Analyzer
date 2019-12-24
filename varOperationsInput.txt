@@ -1,0 +1,15 @@
+
+func f() -> void {
+	def a -> int;
+	a = 10;
+	a += 1;
+	a -= 2;
+	++a, ++a, ++a, ++a;
+	a = a * 2;
+	a = a * 20;
+	a %= 470;
+}
+
+main -> void {
+	def a -> int;	
+}

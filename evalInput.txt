@@ -4,5 +4,7 @@ main -> void {
 	eval(10*a);
 	a += 4;
 	eval(10*a);
+	def v1 = 10, v2 = 10 -> int;
+	eval(v1 == v2 && v2 <= a);
 	eval("a"++"b"*3);
 }

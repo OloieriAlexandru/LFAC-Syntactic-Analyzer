@@ -65,12 +65,12 @@ defType secondTestStructure -> {
 		        return 59;
 		}
 		def justTest[321] -> int;
-		return 1*10.412-testObject::intIntFunction(());
+		return 1*10.412-testStructure::intIntFunction(());
 	}
 }
 
 main -> void {             
-	def b = function1((10.5,10)), c = function1((6.124,412)) -> bool;
+	def b = $function1((10.5,10)), c = $function1((6.124,412)) -> bool;
 	for (def i = 1 -> int ; i <= b ; ++i) -> {
 	 	voidFunc(());	
 	}
@@ -80,5 +80,5 @@ main -> void {
 
 	c = true;
 
-	testObject::incredibleFunction(());
+	testStructure::incredibleFunction(());
 }

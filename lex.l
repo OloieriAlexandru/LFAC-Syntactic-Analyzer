@@ -36,6 +36,9 @@
 "="					{ return OP_EQUALS; }
 "+="					{ return OP_ADDEQ; }
 "-="					{ return OP_SUBEQ; }
+"*="					{ return OP_MULEQ; }
+"/="					{ return OP_DIVEQ; }
+"%="					{ return OP_MODEQ; }
 "."					{ return DOT; }
 ";"					{ return SEMICOLON; }
 "++"					{ return DADD; }

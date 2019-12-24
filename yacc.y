@@ -158,9 +158,9 @@ string	getTypeName(uchar type, bool isConst = false);
 uchar 	getTypeFromTypeName(const string& typeName);
 bool 	declareVariable(const string& name, const variableDeclUnion& declUnion, int inCustomType, int local, bool isConst);
 bool 	declareArray(const string& name, uchar arrayType, uint arraySize, int inCustomType, int local = 1);
-bool    setVariableValue(char *variableName, int value);
+bool    setVariableValue(const char *variableName, void(*fnUpdate)(int&,int), int value);
 int 	getVariableValue(char *variableName);           
-bool 	setArrayValue(char *arrayName, uint pos, int value);
+bool 	setArrayValue(const char *arrayName, uint pos, void(*fnUpdate)(int&,int), int value);
 int 	getArrayValue(char *arrayName, uint pos);
 void 	clearLocalVariables();
 void	printGlobalVariables();
@@ -168,7 +168,8 @@ void	printGlobalArrays();
                        
 int 	arrayPosition;
 string 	operandName;                                             
-uchar   getOperandType(char *operandStr);
+uchar   getOperandType(char *operandStr);                               
+void	updateOperandValue(char *operandStr, void(*fnUpdate)(int&,int), int value);
 uchar	getVariableType(char *variableName);
 uchar 	getArrayType(char *arrayName);
 char* 	buildArrayPositionString(char* arrayName, int position); 
@@ -210,13 +211,14 @@ void	printError(const char*format, ...);
 }
 
 %start 	check
-%token  MAIN IF ELSE FOR WHILE DO RETURN DEFTYPE OBJECT CONSTT FUNC DEF EVAL DOLLAR ARROW O_PAR C_PAR O_BRACE C_BRACE EQUALS NOT_EQUALS OP_EQUALS OP_ADDEQ OP_SUBEQ DOT SEMICOLON DADD DSUB COMMA COLON O_BRACKET C_BRACKET 
+%token  MAIN IF ELSE FOR WHILE DO RETURN DEFTYPE OBJECT CONSTT FUNC DEF EVAL DOLLAR ARROW O_PAR C_PAR O_BRACE C_BRACE EQUALS NOT_EQUALS DOT SEMICOLON COMMA COLON O_BRACKET C_BRACKET 
+%token	OP_MULEQ OP_DIVEQ OP_MODEQ OP_EQUALS OP_ADDEQ OP_SUBEQ DADD DSUB
 %token  <numVal> 	TYPE_NUM TYPE_BOOL
 %token 	<charVal> 	TYPE_CHAR
 %token 	<stringVal> 	TYPE_STR TYPE ID
 %token  <floatVal> 	TYPE_NFLOAT
 %type 	<numVal> 	operand arithmetic_expression_1 arithmetic_expression_2 arithmetic_expression_3 arithmetic_expression_4 arithmetic_expression_5 arithmetic_expression_6 arithmetic_expression_term arithmetic_expression_term_2  
-%type 	<numVal> 	logical_expression_1
+%type 	<numVal> 	logical_expression_1 logical_expression_2 logical_expression_3 logical_expression_4 logical_expression_operand
 %type	<stringVal>     variable_operation_operand string_operations_1 string_operations_2 string_operations_term function_call function_call_header	
 
 %left 	ADD SUB MUL DIV MOD BIT_XOR BIT_AND BIT_OR BIT_SHL BIT_SHR
@@ -397,6 +399,21 @@ variable_declaration			: ID					{ addVariableToCheck($1, 5, NULL); }
 					| ID OP_EQUALS TYPE_NFLOAT		{ addVariableToCheck($1, 3, (void*)&$3); }
 					| ID OP_EQUALS TYPE_CHAR		{ addVariableToCheck($1, 4, (void*)&$3); }
 					| ID O_BRACKET TYPE_NUM C_BRACKET	{ addArrayToCheck($1, $3); }
+					| ID OP_EQUALS DOLLAR ID		{
+		                        	int varValue = getVariableValue($4);
+						if (varValue != ERROR) {
+							uchar varType = getVariableType($4);
+							if (varType == 0) {
+								addVariableToCheck($1, varType, (void*)&varValue);
+							} else {
+				                                addVariableToCheck($1, 5, NULL);
+							}
+						}
+					}
+					| ID OP_EQUALS DOLLAR function_call	{
+	                                 	uchar fType = getFunctionReturnType($4);
+						addVariableToCheck($1, 5, NULL);
+					}
 					;
 
 const_variables_declaration_full	: const_variables_declaration SEMICOLON				{ }
@@ -445,7 +462,7 @@ variables_operations			: variables_operations COMMA variable_operation	{ }
 
 variable_operation			: variable_operation_operand OP_EQUALS arithmetic_expression_1 	{ 
 						if (checkOperationVarType(getOperandType($1),0)) {
-							//ceva
+							updateOperandValue($1, [](int& currValue, int value) { currValue = value; }, $3);	
 						}
 					}
 					| variable_operation_operand OP_EQUALS logical_expression_1	{ checkOperationVarType(getOperandType($1),1); }
@@ -454,12 +471,51 @@ variable_operation			: variable_operation_operand OP_EQUALS arithmetic_expressio
 					| variable_operation_operand OP_EQUALS TYPE_CHAR		{ checkOperationVarType(getOperandType($1),4); }
 					| variable_operation_operand OP_EQUALS DOLLAR function_call	{ checkOperationVarType(getOperandType($1),getFunctionReturnType($4)); }
 					| variable_operation_operand OP_EQUALS DOLLAR ID		{ checkOperationVarType(getOperandType($1),getVariableType($4)); }
-					| variable_operation_operand OP_ADDEQ arithmetic_expression_1 	{ }
-					| variable_operation_operand OP_SUBEQ arithmetic_expression_1 	{ }
-					| DADD variable_operation_operand 	 			{ }
-					| DSUB variable_operation_operand 	 			{ }
-					| variable_operation_operand DADD 	 			{ }
-					| variable_operation_operand DSUB	 			{ }
+					| variable_operation_operand OP_ADDEQ arithmetic_expression_1 	{ 
+						if (checkOperationVarType(getOperandType($1),0)) {
+				                	updateOperandValue($1, [](int& currValue, int toAdd) { currValue += toAdd; }, $3);	
+						}	
+					}
+					| variable_operation_operand OP_SUBEQ arithmetic_expression_1 	{ 
+						if (checkOperationVarType(getOperandType($1),0)) {
+							updateOperandValue($1, [](int& currValue, int toSub) { currValue -= toSub; }, $3);		
+						}
+					}
+					| variable_operation_operand OP_MULEQ arithmetic_expression_1 	{ 
+						if (checkOperationVarType(getOperandType($1),0)) {
+							updateOperandValue($1, [](int& currValue, int toMul) { currValue *= toMul; }, $3);		
+						}
+					}
+					| variable_operation_operand OP_DIVEQ arithmetic_expression_1 	{ 
+						if (checkOperationVarType(getOperandType($1),0)) {
+							updateOperandValue($1, [](int& currValue, int toDiv) { currValue /= (toDiv ? toDiv:1); }, $3);		
+						}
+					}
+					| variable_operation_operand OP_MODEQ arithmetic_expression_1 	{ 
+						if (checkOperationVarType(getOperandType($1),0)) {
+							updateOperandValue($1, [](int& currValue, int toMod) { currValue %= (toMod ? toMod:1); }, $3);		
+						}
+					}
+					| DADD variable_operation_operand 	 			{ 
+						if (checkOperationVarType(getOperandType($2),0)) {
+				               		updateOperandValue($2, [](int& currValue, int toAdd) { currValue += toAdd; }, 1);	
+						}
+					}
+					| DSUB variable_operation_operand 	 			{
+						if (checkOperationVarType(getOperandType($2),0)) {
+		                                	updateOperandValue($2, [](int& currValue, int toSub) { currValue -= toSub; }, 1);		
+						}
+					}
+					| variable_operation_operand DADD 	 			{
+			                	if (checkOperationVarType(getOperandType($1),0)) {
+		                                	updateOperandValue($1, [](int& currValue, int toAdd) { currValue += toAdd; }, 1);	
+						}
+					}
+					| variable_operation_operand DSUB	 			{
+			                	if (checkOperationVarType(getOperandType($1),0)) {
+		                                	updateOperandValue($1, [](int& currValue, int toSub) { currValue -= toSub; }, 1);		 
+						}
+					}
 					;
 
 variable_operation_operand		: ID					{ $$ = $1; }
@@ -508,30 +564,30 @@ operand						: TYPE_NUM                              { $$ = $1; }
 						| ID O_BRACKET TYPE_NUM C_BRACKET	{ $$ = getArrayValue($1, $3); }
 						;
 
-logical_expression_1				: logical_expression_1 OR logical_expression_2			{ }
-						| logical_expression_2                                          { }
+logical_expression_1				: logical_expression_1 OR logical_expression_2			{ $$ = ($1 || $3 ? 1 : 0); }
+						| logical_expression_2                                          { $$ = $1; }
 						;
 
-logical_expression_2				: logical_expression_2 AND logical_expression_3			{ }
-						| logical_expression_3                                          { }
+logical_expression_2				: logical_expression_2 AND logical_expression_3			{ $$ = ($1 && $3 ? 1 : 0); }
+						| logical_expression_3                                          { $$ = $1; }
                                                 ;
 
-logical_expression_3				: NOT logical_expression_4                                      { }
-						| logical_expression_4						{ }
+logical_expression_3				: NOT logical_expression_4                                      { $$ = (1 - ($2 ? 1 : 0)); }
+						| logical_expression_4						{ $$ = $1; }
 						;
 
-logical_expression_4				: O_PAR logical_expression_1 C_PAR					{ }
-						| logical_expression_operand EQUALS logical_expression_operand   	{ }
-						| logical_expression_operand NOT_EQUALS logical_expression_operand 	{ }
-						| logical_expression_operand GT logical_expression_operand   		{ }
-						| logical_expression_operand GET logical_expression_operand  		{ }
-						| logical_expression_operand LT logical_expression_operand   		{ }
-						| logical_expression_operand LET logical_expression_operand   		{ }
-						| TYPE_BOOL								{ }								
+logical_expression_4				: O_PAR logical_expression_1 C_PAR					{ $$ = $2; }
+						| logical_expression_operand EQUALS logical_expression_operand   	{ $$ = ($1 == $3 ? 1 : 0); }
+						| logical_expression_operand NOT_EQUALS logical_expression_operand 	{ $$ = ($1 != $3 ? 1 : 0); }
+						| logical_expression_operand GT logical_expression_operand   		{ $$ = ($1 > $3 ? 1 : 0); }
+						| logical_expression_operand GET logical_expression_operand  		{ $$ = ($1 >= $3 ? 1 : 0); }
+						| logical_expression_operand LT logical_expression_operand   		{ $$ = ($1 < $3 ? 1 : 0); }
+						| logical_expression_operand LET logical_expression_operand   		{ $$ = ($1 <= $3 ? 1 : 0); }
+						| TYPE_BOOL								{ $$ = $1; }								
 						;
                                                  
-logical_expression_operand			: TYPE_BOOL                                                     { }
-						| arithmetic_expression_1                                       { }
+logical_expression_operand			: TYPE_BOOL                                                     { $$ = $1; }
+						| arithmetic_expression_1                                       { $$ = $1; }
 						;
 
 string_operations_1				: string_operations_1 DADD string_operations_2		{ 
@@ -750,35 +806,84 @@ uchar getFunctionReturnType(char *functionName) {
 }
 
 void checkFunctionCall(char *functionName) {
-	string name(functionName);
-	int index = -1;
-	for (int i=0;i<programFunctions.size();++i) {
-	 	if (programFunctions[i].name == name) {
-		 	index = i;
+	int colonPos = -1, len = strlen(functionName);
+	for (int i=0;i<len;++i) {
+		if (functionName[i] == ':') {
+			colonPos = i;
 			break;
 		}
 	}
-	if (index == -1) {
-		printError("Cannot call function named \"%s\"! A function with this name was not declared!\n", name.c_str());
-		return;
-	}
-	vector<uchar> args = functionCallArgumentsType.top();
-	for (int i=index;i<programFunctions.size();++i) {
-	        if (programFunctions[i].name != name || programFunctions[i].arguments.size() < args.size()) {
-			continue;
-		}
-		bool ok = true;
-		for (int j=0;j<args.size();++j){
-			if (args[j] != programFunctions[i].arguments[j].second.type % 5) {
-				ok = false;
+	if (colonPos == -1) {
+		string name(functionName);
+		int index = -1;
+		for (int i=0;i<programFunctions.size();++i) {
+		 	if (programFunctions[i].name == name) {
+			 	index = i;
 				break;
 			}
 		}
-		if (ok) {
+		if (index == -1) {
+			printError("Cannot call function named \"%s\"! A function with this name was not declared!\n", name.c_str());
 			return;
 		}
+		vector<uchar> args = functionCallArgumentsType.top();
+		for (int i=index;i<programFunctions.size();++i) {
+		        if (programFunctions[i].name != name || programFunctions[i].arguments.size() < args.size()) {
+				continue;
+			}
+			bool ok = true;
+			for (int j=0;j<args.size();++j){
+				if (args[j] != programFunctions[i].arguments[j].second.type % 5) {
+					ok = false;
+					break;
+				}
+			}
+			if (ok) {
+				return;
+			}
+		}
+	} else {
+	        string customTypeName(functionName, colonPos);
+		int customTypeIndex = -1;
+		for (int i=0;i<programCustomTypes.size();++i) {
+			if (programCustomTypes[i].name == customTypeName) {
+				customTypeIndex = i;
+				break;
+			}
+		}
+		if (customTypeIndex == -1) {            
+			printError("Cannot call function named \"%s\"! No such custom type was declared!\n", functionName);
+			return;
+		}
+		int index = -1;                      
+		string name(functionName+colonPos+1);
+		for (int i=0;i<programCustomTypes[customTypeIndex].functions.size();++i) {
+			if (programCustomTypes[customTypeIndex].functions[i].name == name) {
+				index = i;
+				break;
+			}
+		}
+		if (index == -1) {
+			printError("Cannot call function named \"%s\"! The custom type doesn't have such a function!\n", functionName);
+		}
+		vector<uchar> args = functionCallArgumentsType.top();
+		for (int i=index;i<programCustomTypes[customTypeIndex].functions.size();++i) {
+		        if (programCustomTypes[customTypeIndex].functions[i].name != name || programCustomTypes[customTypeIndex].functions[i].arguments.size() < args.size()) {
+				continue;
+			}
+			bool ok = true;
+			for (int j=0;j<args.size();++j){
+				if (args[j] != programCustomTypes[customTypeIndex].functions[i].arguments[j].second.type % 5) {
+					ok = false;
+					break;
+				}
+			}
+			if (ok) {
+				return;
+			}
+		}		
 	}
-	printError("Invalid arguments when calling a function called \"%s\"! No matching function signature found!\n", name.c_str());
+	printError("Invalid arguments when calling a function called \"%s\"! No matching function signature found!\n", functionName);
 }
 
 void clearFunctionCallArguments() {
@@ -939,7 +1044,7 @@ bool declareArray(const string& name, uchar arrayType, uint arraySize, int inCus
 		printError("Local array \"%s\" was previously defined!\n", name.c_str());
 		return false;
 	} else if (local == 0 && inCustomType == 1 && customTypeArrs.count(name)) {
-        	printError("An array with name \"%s\" was previously defined in custom type \"%s\"!\n", thisCustomType.name.c_str(), name.c_str());
+		printError("An array with name \"%s\" was previously defined in custom type \"%s\"!\n", thisCustomType.name.c_str(), name.c_str());
 		return false;
 	} else if (local == 0 && inCustomType == 0 && globalArrs.count(name)) {  
 		printError("Global array \"%s\" was previously defined!\n", name.c_str());
@@ -960,15 +1065,15 @@ bool declareArray(const string& name, uchar arrayType, uint arraySize, int inCus
 	return true;	
 }
 
-bool setVariableValue(char *variableName, int value) {
+bool setVariableValue(const char *variableName, void(*fnUpdate)(int&,int), int value) {
  	string name(variableName);
 	bool res = false;
 	if (localV.count(name)) {
 		res = true;
-		localV[name].first.intUnionMember.intVal = value;
+		fnUpdate(localV[name].first.intUnionMember.intVal, value);
 	} else if (globalV.count(name)) {
 		res = true;
-		globalV[name].first.intUnionMember.intVal = value;
+		fnUpdate(globalV[name].first.intUnionMember.intVal, value);
 	}
 	return res;
 }
@@ -988,18 +1093,18 @@ int getVariableValue(char *variableName) {
 	return ERRORR;
 }
 
-bool setArrayValue(char *arrayName, uint pos, int value) {                 
+bool setArrayValue(const char *arrayName, uint pos, void(*fnUpdate)(int&,int), int value) {                 
 	string name(arrayName);
 	bool res = false;
 	if (localArrs.count(name)) {
 		if (pos < localArrs[name].second.second) {
-			localArrs[name].first[pos] = value;	
+			fnUpdate(localArrs[name].first[pos], value);
 		} else {
 			printError("Index %d out of bounds for local array \"%s\"!\n", pos, name.c_str());
 		}
 	} else if (globalArrs.count(name)) {
 	 	if (pos < globalArrs[name].second.second) {
-		        globalArrs[name].first[pos] = value;
+			fnUpdate(globalArrs[name].first[pos], value);
 		} else {
 			printError("Index %d out of bounds for global array \"%s\"!\n", pos, name.c_str());
 		}
@@ -1071,6 +1176,17 @@ uchar getOperandType(char *operandStr) {
 	} else {
 		operandName = string(operandStr);
 		return getVariableType(operandStr);
+	}
+}
+
+void updateOperandValue(char *operandStr, void(*fnUpdate)(int&,int), int value) {
+        if (!operandStr) {
+		return;
+	}    
+	if (arrayPosition == -1) {
+		setVariableValue(operandName.c_str(), fnUpdate, value);
+	} else {
+		setArrayValue(operandName.c_str(), arrayPosition, fnUpdate, value);
 	}
 }
 
