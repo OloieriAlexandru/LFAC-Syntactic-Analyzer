@@ -145,7 +145,7 @@ vector<pair<string,variableDeclUnion>>			toCheckVars;
 vector<pair<string,int>>				toCheckArrays;
 umap<char,uchar>					varDeclType;
 umap<string,pair<variableValueUnion,string>>		localV, globalV;
-umap<string,pair<vector<int>,pair<string,int>>>		localArrs, globalArrs;
+umap<string,pair<vector<int>,pair<string,int>>>		localArrs, globalArrs;  
                                                       
 void 	addVariableToCheck(char* variableName, uchar variableType, void* variableValue, bool isConst = false);
 void	addArrayToCheck(char* arrayName, int arraySize);
@@ -174,6 +174,10 @@ uchar	getVariableType(char *variableName);
 uchar 	getArrayType(char *arrayName);
 char* 	buildArrayPositionString(char* arrayName, int position); 
 bool 	checkOperationVarType(uchar varType, uchar expectedType);
+                                                                                
+uset<string>	initCustomTypeV, initLocalV, initGlobalV;
+bool 		checkIfVariableWasInit(const char *variableName);
+void		markVariableAsInit(const char *variableName);
 
 // Custom types parsing:
 
@@ -462,57 +466,58 @@ variables_operations			: variables_operations COMMA variable_operation	{ }
 
 variable_operation			: variable_operation_operand OP_EQUALS arithmetic_expression_1 	{ 
 						if (checkOperationVarType(getOperandType($1),0)) {
+							markVariableAsInit($1);
 							updateOperandValue($1, [](int& currValue, int value) { currValue = value; }, $3);	
 						}
 					}
-					| variable_operation_operand OP_EQUALS logical_expression_1	{ checkOperationVarType(getOperandType($1),1); }
-					| variable_operation_operand OP_EQUALS TYPE_STR			{ checkOperationVarType(getOperandType($1),2); }
-					| variable_operation_operand OP_EQUALS TYPE_NFLOAT		{ checkOperationVarType(getOperandType($1),3); }
-					| variable_operation_operand OP_EQUALS TYPE_CHAR		{ checkOperationVarType(getOperandType($1),4); }
-					| variable_operation_operand OP_EQUALS DOLLAR function_call	{ checkOperationVarType(getOperandType($1),getFunctionReturnType($4)); }
-					| variable_operation_operand OP_EQUALS DOLLAR ID		{ checkOperationVarType(getOperandType($1),getVariableType($4)); }
+					| variable_operation_operand OP_EQUALS logical_expression_1	{ if (checkOperationVarType(getOperandType($1),1)) markVariableAsInit($1); }
+					| variable_operation_operand OP_EQUALS TYPE_STR			{ if (checkOperationVarType(getOperandType($1),2)) markVariableAsInit($1); }
+					| variable_operation_operand OP_EQUALS TYPE_NFLOAT		{ if (checkOperationVarType(getOperandType($1),3)) markVariableAsInit($1); }
+					| variable_operation_operand OP_EQUALS TYPE_CHAR		{ if (checkOperationVarType(getOperandType($1),4)) markVariableAsInit($1); }
+					| variable_operation_operand OP_EQUALS DOLLAR function_call	{ if (checkOperationVarType(getOperandType($1),getFunctionReturnType($4))) markVariableAsInit($1); }
+					| variable_operation_operand OP_EQUALS DOLLAR ID		{ if (checkOperationVarType(getOperandType($1),getVariableType($4)) && checkIfVariableWasInit($4))  markVariableAsInit($1); }
 					| variable_operation_operand OP_ADDEQ arithmetic_expression_1 	{ 
-						if (checkOperationVarType(getOperandType($1),0)) {
+						if (checkIfVariableWasInit($1) && checkOperationVarType(getOperandType($1),0)) {
 				                	updateOperandValue($1, [](int& currValue, int toAdd) { currValue += toAdd; }, $3);	
 						}	
 					}
 					| variable_operation_operand OP_SUBEQ arithmetic_expression_1 	{ 
-						if (checkOperationVarType(getOperandType($1),0)) {
+						if (checkIfVariableWasInit($1) && checkOperationVarType(getOperandType($1),0)) {
 							updateOperandValue($1, [](int& currValue, int toSub) { currValue -= toSub; }, $3);		
 						}
 					}
 					| variable_operation_operand OP_MULEQ arithmetic_expression_1 	{ 
-						if (checkOperationVarType(getOperandType($1),0)) {
+						if (checkIfVariableWasInit($1) && checkOperationVarType(getOperandType($1),0)) {
 							updateOperandValue($1, [](int& currValue, int toMul) { currValue *= toMul; }, $3);		
 						}
 					}
 					| variable_operation_operand OP_DIVEQ arithmetic_expression_1 	{ 
-						if (checkOperationVarType(getOperandType($1),0)) {
+						if (checkIfVariableWasInit($1) && checkOperationVarType(getOperandType($1),0)) {
 							updateOperandValue($1, [](int& currValue, int toDiv) { currValue /= (toDiv ? toDiv:1); }, $3);		
 						}
 					}
 					| variable_operation_operand OP_MODEQ arithmetic_expression_1 	{ 
-						if (checkOperationVarType(getOperandType($1),0)) {
+						if (checkIfVariableWasInit($1) && checkOperationVarType(getOperandType($1),0)) {
 							updateOperandValue($1, [](int& currValue, int toMod) { currValue %= (toMod ? toMod:1); }, $3);		
 						}
 					}
 					| DADD variable_operation_operand 	 			{ 
-						if (checkOperationVarType(getOperandType($2),0)) {
+						if (checkIfVariableWasInit($2) && checkOperationVarType(getOperandType($2),0)) {
 				               		updateOperandValue($2, [](int& currValue, int toAdd) { currValue += toAdd; }, 1);	
 						}
 					}
 					| DSUB variable_operation_operand 	 			{
-						if (checkOperationVarType(getOperandType($2),0)) {
+						if (checkIfVariableWasInit($2) && checkOperationVarType(getOperandType($2),0)) {
 		                                	updateOperandValue($2, [](int& currValue, int toSub) { currValue -= toSub; }, 1);		
 						}
 					}
 					| variable_operation_operand DADD 	 			{
-			                	if (checkOperationVarType(getOperandType($1),0)) {
+			                	if (checkIfVariableWasInit($1) && checkOperationVarType(getOperandType($1),0)) {
 		                                	updateOperandValue($1, [](int& currValue, int toAdd) { currValue += toAdd; }, 1);	
 						}
 					}
 					| variable_operation_operand DSUB	 			{
-			                	if (checkOperationVarType(getOperandType($1),0)) {
+			                	if (checkIfVariableWasInit($1) && checkOperationVarType(getOperandType($1),0)) {
 		                                	updateOperandValue($1, [](int& currValue, int toSub) { currValue -= toSub; }, 1);		 
 						}
 					}
@@ -559,7 +564,7 @@ arithmetic_expression_term			: O_PAR arithmetic_expression_1 C_PAR				{ $$ = $2;
 						;
                                                                                  
 operand						: TYPE_NUM                              { $$ = $1; }
-						| ID                                    { $$ = getVariableValue($1); }
+						| ID                                    { if (checkIfVariableWasInit($1)) $$ = getVariableValue($1); }
 						| function_call				{ }
 						| ID O_BRACKET TYPE_NUM C_BRACKET	{ $$ = getArrayValue($1, $3); }
 						;
@@ -641,7 +646,7 @@ function_call_arg				: arithmetic_expression_1			{ functionCallArgumentsType.top
 						| TYPE_STR					{ functionCallArgumentsType.top().pb(2); }
 						| TYPE_NFLOAT					{ functionCallArgumentsType.top().pb(3); }
 						| TYPE_CHAR					{ functionCallArgumentsType.top().pb(4); }
-						| DOLLAR ID					{ functionCallArgumentsType.top().pb(getVariableType($2)); }
+						| DOLLAR ID					{ if (checkIfVariableWasInit($2)) functionCallArgumentsType.top().pb(getVariableType($2)); }
 						| DOLLAR function_call				{ functionCallArgumentsType.top().pb(getFunctionReturnType($2)); }
 						;
 
@@ -784,6 +789,7 @@ bool clearFunctionArgsArray() {
 			thisFunctionArgs[i].second.stringUnionMember.stringVal = 0;
 		}
 	thisFunctionArgs.clear();
+	initLocalV.clear();
 	return true; 	
 }
    
@@ -926,15 +932,20 @@ void addArrayToCheck(char* arrayName, int arraySize) {
 
 bool checkVariables(uchar varType) {
 	for (auto var : toCheckVars) {
+		bool was = false;
 		if (var.second.type == 5) {
 			var.second.type = varType;
 		} else {
 		        if (var.second.type != varType) {
 				printError("Invalid type for variable \"%s\"\n",var.first.c_str());
 				continue;
-			}              
+			}
+			was = true;
 		}
 		declareVariable(var.first, var.second, customTypeParsing, functionParsing, var.second.intUnionMember.isConst); 	 	                           
+		if (was) {
+			markVariableAsInit(var.first.c_str());              	
+		}
 	}
 	toCheckVars.clear();
 }
@@ -1032,6 +1043,7 @@ bool declareVariable(const string& name, const variableDeclUnion& declUnion, int
 		localV[name] = mp(value,type);
 	} else if (local == 0 && inCustomType == 1) {
 		variableInfo varInfo(value, name, type);
+		customTypeVars.insert(name);
 	        thisCustomType.variables.pb(varInfo);
 	} else {
 		globalV[name] = mp(value,type);
@@ -1058,6 +1070,7 @@ bool declareArray(const string& name, uchar arrayType, uint arraySize, int inCus
 	if (local == 1) {
 		localArrs[name] = mp(arr,mp(type,arraySize));
 	} else if (local == 0 && inCustomType == 1) {
+		customTypeArrs.insert(name);
 	        thisCustomType.arrays.pb(mp(mp(name, type),arraySize));
 	} else {
 		globalArrs[name] = mp(arr,mp(type,arraySize));
@@ -1082,7 +1095,7 @@ int getVariableValue(char *variableName) {
 	string name(variableName);
 	if (localV.count(name)){
 		return localV[name].first.intUnionMember.intVal;
-	}
+	}                             
 	if (functionParsing && functionArgsVarsCheck.count(name)) {
 	 	return 0; 
 	}
@@ -1120,6 +1133,9 @@ int getArrayValue(char *arrayName, uint pos) {
 		}
 		printError("Index %d out of bounds for local array \"%s\"!\n", pos, name.c_str());
 		return ERROR;
+	}
+	if (customTypeArrs.count(name)) {
+		return 0;
 	}
 	if (globalArrs.count(name)) {
 	 	if (pos < globalArrs[name].second.second) {
@@ -1258,6 +1274,54 @@ bool checkOperationVarType(uchar varType, uchar expectedType) {
 		printError("Invalid type for an operation on variable/array \"%s\"!\n", operandName.c_str());
 	}
 	return res;
+}
+
+bool checkIfVariableWasInit(const char *variableName) {
+        string name(variableName);
+	if (functionParsing && localV.count(name)) {
+		if (initLocalV.count(name)) {
+		  	return true;
+		} else {
+	                printError("Local variable \"%s\" has to be initialized explicitly in order to be used!\n", variableName);
+			return false;
+		}
+	}
+	if (customTypeParsing) {
+	       if (initCustomTypeV.count(name)) {
+			return true;
+		} else {
+		   	printError("Global variable \"%s\" has to be initialized explicitly in order to be used!\n", variableName);
+			return false;
+		}
+	}
+	if (globalV.count(name)) {
+		if (initGlobalV.count(name)) {
+			return true;
+		} else {
+		        printError("Global variable \"%s\" has to be initialized explicitly in order to be used!\n", variableName);
+			return false;	
+		}
+	}
+	if (functionParsing && functionArgsVarsCheck.count(name)) {
+		return true;
+	}
+	printError("The variable \"%s\" was not declared in the program!\n", name.c_str());
+	return false;
+}
+
+void markVariableAsInit(const char *variableName) {
+	string name(variableName);	
+	if (functionParsing && localV.count(name)){
+	        initLocalV.insert(name);
+		return;
+	}
+	if (customTypeParsing && customTypeVars.count(name)) {
+	        initCustomTypeV.insert(name);
+		return;
+	}
+	if (globalV.count(name)) {
+	 	initGlobalV.insert(name);
+	}
 }
 
 void initCustomType(char* customTypeName) {

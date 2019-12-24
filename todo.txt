@@ -17,7 +17,7 @@
 3) Semantic analysis:
 * Any variable that appears in a program has been previously defined							- done
 * A variable should not be declared more than once									- done
-* A variable appearing in the right side of an expression should have been initialized explicitly			- to do
+* A variable appearing in the right side of an expression should have been initialized explicitly			- done
 * A function is not defined more than once with the same signature							- done
 * A function that is called in the program has been defined								- done
 * The left side of an assignment has the same type as the right side							- done

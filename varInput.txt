@@ -20,9 +20,8 @@ func f() -> bool { }
 
 main -> void {
 	intVar = $cevaFunc(());
-	boolArray[3] = $cevaFunc(());
 	boolArray[2] = $f(());
-	strVar = "asd";
-	strVar = $charVar;
+	def ss -> string;
+	strVar = $ss;   
  	return 0;
 }
