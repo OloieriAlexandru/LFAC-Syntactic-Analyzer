@@ -10,7 +10,8 @@
 #include 	<iostream>
 #include 	<iomanip>
 #include 	<cstdarg>        
-#include 	<windows.h>                            
+#include 	<windows.h>
+#include 	<fstream>                            
 #define uint 	unsigned int
 #define uchar 	unsigned char
 #define vector	std::vector
@@ -26,6 +27,8 @@
 #define NO_VAR	101
 #define NO_ARR	102
 #define NO_FUN	103                                     
+
+std::ofstream fileOut;
 
 extern int yylineno;
 void yyerror(const char *str) { printf("%s %d\n", str, yylineno); }
@@ -196,6 +199,8 @@ void 	initCustomType(char* customTypeName);
 void	printCustomTypeVariables();
 void	printCustomTypeArrays();
 void 	saveThisCustomType();
+
+bool 	checkIfVarTypeWasDefined(const char* typeName);
 
 void 	initFunctionArgsLogic();
 void 	initVarDeclLogic();
@@ -440,7 +445,7 @@ const_variable_declaration		: ID OP_EQUALS arithmetic_expression_1			{ addVariab
 custom_type_variable_declaration_full	: custom_type_variable_declaration SEMICOLON			{ }
 					;
 
-custom_type_variable_declaration	: DEF OBJECT ID OP_EQUALS custom_type_variable_declaration_body	ARROW ID { }
+custom_type_variable_declaration	: DEF OBJECT ID OP_EQUALS custom_type_variable_declaration_body	ARROW ID { if (checkIfVarTypeWasDefined($7)){ } }
 					;
 
 custom_type_variable_declaration_body	: O_BRACE custom_type_variable_declaration_decl C_BRACE		{ }
@@ -705,50 +710,50 @@ bool addFunctionArg(char *argName, uchar predefinedValueType, void *predefinedVa
 
 int printFunctionInfo(int functionInCustomType) {
 	if (!functionInCustomType) {
-		std::cout<<dotsLineStr;
+		fileOut<<dotsLineStr;
 	}
- 	std::cout<<"Function name: ";
+ 	fileOut<<"Function name: ";
 	if (functionInCustomType) {
-		std::cout<<thisCustomType.name<<'.';
+		fileOut<<thisCustomType.name<<'.';
 	} 
-	std::cout<<thisFunctionInfo.first<<'\n';
-	std::cout<<"Function return value: "<<thisFunctionInfo.second<<'\n';
-	std::cout<<"Number of arguments: "<< thisFunctionArgs.size()<<'\n';
+	fileOut<<thisFunctionInfo.first<<'\n';
+	fileOut<<"Function return value: "<<thisFunctionInfo.second<<'\n';
+	fileOut<<"Number of arguments: "<< thisFunctionArgs.size()<<'\n';
 	for (uint i=0;i<thisFunctionArgs.size();++i) {
 		printFunctionArg(thisFunctionArgs[i]);
 	}
-	std::cout<<"Local variables: "<< localV.size() << '\n';
+	fileOut<<"Local variables: "<< localV.size() << '\n';
 	for (auto var : localV) {
 		printVariableInfo(var.first, var.second.second, var.second.first);
 	}
-	std::cout<<"Local arrays: "<< localArrs.size() << '\n';
+	fileOut<<"Local arrays: "<< localArrs.size() << '\n';
 	for (auto arr : localArrs) {
 		printArrayInfo(arr.first, arr.second.second.first, arr.second.second.second);
 	}
-	std::cout<<'\n';		
+	fileOut<<'\n';		
 }
                                                         
 void printFunctionArg(const pair<string,functionArgUnion> &arg) {              
-	std::cout<<"* Arg name: "<<arg.first<<", ";
-	std::cout<<"arg type: ";
+	fileOut<<"* Arg name: "<<arg.first<<", ";
+	fileOut<<"arg type: ";
 	switch(arg.second.type) {
-	 	case 0: case 5: std::cout<<"int"; break;
-		case 1: case 6: std::cout<<"bool"; break;
-		case 2: case 7: std::cout<<"string"; break;
-		case 3: case 8: std::cout<<"float"; break;
-		case 4: case 9: std::cout<<"char"; break;
+	 	case 0: case 5: fileOut<<"int"; break;
+		case 1: case 6: fileOut<<"bool"; break;
+		case 2: case 7: fileOut<<"string"; break;
+		case 3: case 8: fileOut<<"float"; break;
+		case 4: case 9: fileOut<<"char"; break;
 		default: break;
 	}
-	std::cout<<", predefined value: ";
+	fileOut<<", predefined value: ";
 	switch(arg.second.type) {
-	 	case 0: std::cout<<arg.second.intUnionMember.intVal; break;
-		case 1: std::cout<<arg.second.boolUnionMember.boolVal ? "true" : "false"; break;
-		case 2: if (arg.second.stringUnionMember.stringVal) std::cout<<'\''<<arg.second.stringUnionMember.stringVal<<'\''; break;
-		case 3: std::cout<<std::setprecision(3)<<std::fixed<<arg.second.floatUnionMember.floatVal; break;
-		case 4: std::cout<<'\''<<arg.second.charUnionMember.charVal<<'\''; break;
-		default:std::cout<<"none"; break;
+	 	case 0: fileOut<<arg.second.intUnionMember.intVal; break;
+		case 1: fileOut<<arg.second.boolUnionMember.boolVal ? "true" : "false"; break;
+		case 2: if (arg.second.stringUnionMember.stringVal) fileOut<<'\''<<arg.second.stringUnionMember.stringVal<<'\''; break;
+		case 3: fileOut<<std::setprecision(3)<<std::fixed<<arg.second.floatUnionMember.floatVal; break;
+		case 4: fileOut<<'\''<<arg.second.charUnionMember.charVal<<'\''; break;
+		default:fileOut<<"none"; break;
 	}
-	std::cout<<'\n';
+	fileOut<<'\n';
 }
 
 bool saveFunctionInfo(int functionInCustomType) {
@@ -973,20 +978,20 @@ bool checkArrays(uchar arrayType) {
 }
 
 void printVariableInfo(const string& name, const string& type, const variableValueUnion& varInfo) {
-	std::cout<<type<<' '<<name<<", value: ";
+	fileOut<<type<<' '<<name<<", value: ";
 	switch(varInfo.type) {
-		case 0: std::cout<<varInfo.intUnionMember.intVal; break;
-		case 1: std::cout<<varInfo.boolUnionMember.boolVal; break;
-		case 2: if (varInfo.stringUnionMember.stringVal) std::cout<<'\''<<varInfo.stringUnionMember.stringVal<<'\''; break;
-		case 3: std::cout<<std::setprecision(3)<<std::fixed<<varInfo.floatUnionMember.floatVal; break;
-		case 4: std::cout<<'\''<<varInfo.charUnionMember.charVal<<'\''; break;
+		case 0: fileOut<<varInfo.intUnionMember.intVal; break;
+		case 1: fileOut<<varInfo.boolUnionMember.boolVal; break;
+		case 2: if (varInfo.stringUnionMember.stringVal) fileOut<<'\''<<varInfo.stringUnionMember.stringVal<<'\''; break;
+		case 3: fileOut<<std::setprecision(3)<<std::fixed<<varInfo.floatUnionMember.floatVal; break;
+		case 4: fileOut<<'\''<<varInfo.charUnionMember.charVal<<'\''; break;
 		default:break;
 	}                    
-	std::cout<<'\n';
+	fileOut<<'\n';
 }
      
 void printArrayInfo(const string& name, const string& type, int size) {
-        std::cout<<type <<' '<<name<<'['<<size<<"]\n";
+        fileOut<<type <<' '<<name<<'['<<size<<"]\n";
 }
 
 string getTypeName(uchar type, bool isConst) {
@@ -1023,7 +1028,7 @@ bool declareVariable(const string& name, const variableDeclUnion& declUnion, int
 	} else if (local == 0 && inCustomType && customTypeVars.count(name)) {
                 printError("A variable with name \"%s\" was previously defined in custom type \"%s\"!\n", thisCustomType.name.c_str(), name.c_str());
 		return false;
-	} else if (local == 0 && globalV.count(name)) {
+	} else if (local == 0 && !inCustomType && globalV.count(name)) {
 		printError("Global variable \"%s\" was previously defined!\n", name.c_str());
 		return false;
 	}
@@ -1157,22 +1162,22 @@ void printGlobalVariables() {
 	if (!globalV.size()) {
 		return;
 	}
-	std::cout<<dotsLineStr<<"Global variables:\n\n";
+	fileOut<<dotsLineStr<<"Global variables:\n\n";
 	for (auto& var : globalV) {
 	 	printVariableInfo(var.first, var.second.second, var.second.first);
 	}
-	std::cout<<'\n';
+	fileOut<<'\n';
 }
 
 void printGlobalArrays() {
 	if (!globalArrs.size()) { 
 		return;
 	}
-	std::cout<<dotsLineStr<<"Global arrays:\n\n";
+	fileOut<<dotsLineStr<<"Global arrays:\n\n";
 	for (auto& arr : globalArrs) {
 	 	printArrayInfo(arr.first, arr.second.second.first, arr.second.second.second);
 	}
-	std::cout<<'\n';
+	fileOut<<'\n';
 }
 
 uchar getOperandType(char *operandStr) {
@@ -1215,7 +1220,7 @@ uchar getVariableType(char *variableName) {
 	}
 	if (customTypeParsing) {
 		if (customTypeVars.count(name)) {
-			std::cout<<name<<" found\n";
+			fileOut<<name<<" found\n";
 		 	return 0;
 		}
 	}
@@ -1234,7 +1239,7 @@ uchar getArrayType(char *arrayName) {
 	}
 	if (customTypeParsing) {
 		if (customTypeArrs.count(name)) {
-			std::cout<<name<<" found\n";
+			fileOut<<name<<" found\n";
 			return 0;
 		}
 	}
@@ -1327,29 +1332,29 @@ void markVariableAsInit(const char *variableName) {
 void initCustomType(char* customTypeName) {
 	string name(customTypeName);
 	thisCustomType.name = customTypeName;
-	std::cout<<dotsLineStr<<dotsLineStr<<"Custom type: "<<name<<"\n\n";
+	fileOut<<dotsLineStr<<dotsLineStr<<"Custom type: "<<name<<"\n\n";
 }
 
 void printCustomTypeVariables() {
 	if (!thisCustomType.variables.size()) {
 		return;
 	}
-        std::cout<<thisCustomType.name<<" members (variables):\n";
+        fileOut<<thisCustomType.name<<" members (variables):\n";
 	for (auto& var : thisCustomType.variables) {
 		printVariableInfo(var.name, var.type, var.value);
 	}
-	std::cout<<'\n';
+	fileOut<<'\n';
 }
 
 void printCustomTypeArrays() {
 	if (!thisCustomType.arrays.size()) {
 		return;
 	}
-	std::cout<<thisCustomType.name<<" members (arrays):\n";
+	fileOut<<thisCustomType.name<<" members (arrays):\n";
 	for (auto& arr : thisCustomType.arrays) {
 	        printArrayInfo(arr.first.first, arr.first.second, arr.second);
 	}
-	std::cout<<'\n';
+	fileOut<<'\n';
 }
 
 void saveThisCustomType() {
@@ -1359,6 +1364,17 @@ void saveThisCustomType() {
 	thisCustomType.arrays.clear();
 	customTypeVars.clear();
 	customTypeArrs.clear();
+}
+
+bool checkIfVarTypeWasDefined(const char* typeName) {
+	string name(typeName);
+	for (int i=0;i<programCustomTypes.size();++i){
+		if (name == programCustomTypes[i].name){
+			return true;
+		}
+	}
+	printError("Custom type \"%s\" was not defined!\n", typeName);
+	return false;
 }
 
 void initFunctionArgsLogic() {
@@ -1406,7 +1422,27 @@ void printError(const char*format, ...) {
 	SetConsoleTextAttribute(hConsole, 7);
 }
  
-int main() {
+int main(int argc, char* argv[]) {
+	const char* fileName;
+	if (argc == 1){
+		fileOut.open("results/symbol_table.txt", std::ofstream::out);
+		fileName = "symbol_table.txt";
+	} else {
+		if (strlen(argv[1])){
+			string nm = string("results/") + string(argv[1]);
+			fileOut.open(nm.c_str(), std::ofstream::out);
+			fileName = (const char*)argv[1];
+		} else {
+			fileOut.open("results/symbol_table.txt", std::ofstream::out);
+			fileName = "symbol_table.txt";
+		}
+	}
+	if (!fileOut.is_open()){
+		printError("Failed to create file %s!\n", fileName);
+		return 1;
+	}
 	init();             
-	return yyparse();
+	int res = yyparse();
+	fileOut.close();
+	return res;
 }

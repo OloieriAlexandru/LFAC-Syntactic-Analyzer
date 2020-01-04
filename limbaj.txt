@@ -18,7 +18,7 @@ def ID -> type;
 * multiple:
 def ID1 = value, ID2 -> type;
 * arrays:
-def ID -> type[size];
+def ID[size] -> type;
 * const:
 def const ID -> type;
 * custom type:

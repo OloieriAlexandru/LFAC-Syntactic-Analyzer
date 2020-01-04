@@ -2,12 +2,16 @@
 func f() -> void {
 	def a -> int;
 	a = 10;
+	eval(a);
 	a += 1;
 	a -= 2;
+	eval(a);
 	++a, ++a, ++a, ++a;
 	a = a * 2;
 	a = a * 20;
+	eval(a);
 	a %= 470;
+	eval(a);
 }
 
 main -> void {

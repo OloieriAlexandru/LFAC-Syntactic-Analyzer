@@ -6,6 +6,15 @@ func secondFun(int a, float b) -> int { }
 
 func shortFun() -> int { }
 
+def object badVar = { } -> myType;
+
+defType myType -> {
+	def a -> float;
+ 	def var -> int;
+}
+
+def object goodVar = { } -> myType;
+
 main -> void {
 	def a = 10, a = 50 -> int;
 	def c[100] -> int;
